@@ -2,9 +2,9 @@ name: Sync JWMatrixButtons + Auto Release
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
     paths:
-      - "libraries/JWMatrixButtons/**"
+      - "libraries/JWMatrixButtons/library.properties"
       - ".github/workflows/sync-jwmatrixbuttons.yml"
   workflow_dispatch:
 
