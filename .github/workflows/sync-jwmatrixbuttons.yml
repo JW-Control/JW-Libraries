@@ -12,19 +12,19 @@ jobs:
   sync:
     runs-on: ubuntu-latest
 
-    # Permisos del GITHUB_TOKEN (NO es tu PAT). Igual dejamos explícito.
+    # Permisos del GITHUB_TOKEN (no es el PAT). Buena práctica dejarlo explícito.
     permissions:
-      contents: read
+      contents: write
 
     steps:
-      # 1) Checkout del monorepo SIN dejar credenciales del github-actions[bot]
+      # 1) Checkout del monorepo SIN credenciales del github-actions[bot]
       - name: Checkout monorepo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      # 2) Identidad local (para tags/commits locales si hiciera falta)
+      # 2) Identidad de git (para operaciones locales en este repo)
       - name: Configure git identity
         run: |
           git config user.name "JW-Control CI"
@@ -50,7 +50,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      # 4) Configurar remote dist usando PAT (clave para poder pushear al subrepo)
+      # 4) Configurar remote dist usando PAT (CLAVE: el remote ya va autenticado)
       - name: Add distribution remote (PAT)
         shell: bash
         env:
@@ -66,49 +66,43 @@ jobs:
 
       # 5) Subtree split del folder de la librería
       - name: Subtree split
+        id: split
+        shell: bash
         run: |
           git subtree split --prefix=libraries/JWMatrixButtons -b split-jwmatrixbuttons
+          SHA=$(git rev-parse split-jwmatrixbuttons)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Split commit SHA: $SHA"
 
       # 6) Push del subtree al subrepo (main)
       - name: Push subtree to subrepo (main)
         run: |
           git push dist split-jwmatrixbuttons:main --force
 
-      # 7) Tag + Release en el subrepo (si no existe)
-      - name: Create tag + release in subrepo (only if missing)
+      # 7) Crear GitHub Release (esto crea el TAG remoto si no existe)
+      - name: Create GitHub Release in subrepo (only if missing)
         shell: bash
         env:
-          TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
           GH_TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
           TAG: ${{ steps.ver.outputs.tag }}
           VERSION: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.split.outputs.sha }}
         run: |
-          set -euo pipefail
+          set -e
 
-          # Clonar el subrepo autenticado (así origin queda con permisos)
-          rm -rf _distrepo
-          git clone "https://x-access-token:${TOKEN}@github.com/JW-Control/JWMatrixButtons.git" _distrepo
-          cd _distrepo
+          echo "Repo: JW-Control/JWMatrixButtons"
+          echo "TAG:  $TAG"
+          echo "SHA:  $SHA"
 
-          git checkout main
-          git pull origin main
-          git fetch --tags
-
-          # Tag (si falta)
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists. Skipping tag creation."
-          else
-            echo "Creating tag $TAG"
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
+          # Si ya existe el release, no hacer nada
+          if gh release view "$TAG" -R "JW-Control/JWMatrixButtons" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Skipping."
+            exit 0
           fi
 
-          # Release (si falta)
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists. Skipping release creation."
-          else
-            echo "Creating GitHub Release $TAG"
-            gh release create "$TAG" \
-              --title "JWMatrixButtons $TAG" \
-              --notes "Release $TAG (version=$VERSION)."
-          fi
+          # Crear release y tag remoto apuntando al commit exacto que acabas de pushear
+          gh release create "$TAG" \
+            -R "JW-Control/JWMatrixButtons" \
+            --target "$SHA" \
+            --title "JWMatrixButtons $TAG" \
+            --notes "Release $TAG (version=$VERSION)."
