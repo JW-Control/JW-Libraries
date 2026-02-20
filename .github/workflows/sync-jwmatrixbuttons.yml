@@ -5,62 +5,92 @@ on:
     branches: [ "main" ]
     paths:
       - "libraries/JWMatrixButtons/**"
+      - ".github/workflows/sync-jwmatrixbuttons.yml"
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout monorepo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Configure git identity
         run: |
-          git config user.name "jw-control-bot"
+          git config user.name "JW-Control CI"
           git config user.email "jw.control.peru@gmail.com"
 
       - name: Extract version from library.properties
         id: ver
+        shell: bash
         run: |
-          VERSION=$(grep '^version=' libraries/JWMatrixButtons/library.properties | cut -d'=' -f2 | tr -d '\r' | xargs)
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected VERSION=$VERSION"
+          PROP="libraries/JWMatrixButtons/library.properties"
+          if [ ! -f "$PROP" ]; then
+            echo "ERROR: $PROP not found"
+            exit 1
+          fi
+          VERSION=$(grep -E '^version=' "$PROP" | head -n1 | cut -d'=' -f2 | tr -d ' \r')
+          if [ -z "$VERSION" ]; then
+            echo "ERROR: version= not found in $PROP"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Add distribution remote (token)
+      - name: Add distribution remote
         run: |
-          git remote remove dist 2>/dev/null || true
-          git remote add dist https://x-access-token:${{ secrets.DIST_PUSH_TOKEN }}@github.com/JW-Control/JWMatrixButtons.git
-          git remote -v
+          git remote remove dist || true
+          git remote add dist https://github.com/JW-Control/JWMatrixButtons.git
+
+      - name: Use PAT for GitHub HTTPS pushes
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Subtree split
         run: |
           git subtree split --prefix=libraries/JWMatrixButtons -b split-jwmatrixbuttons
 
-      - name: Push subtree to subrepo
+      - name: Push subtree to subrepo (main)
         run: |
           git push dist split-jwmatrixbuttons:main --force
 
-      - name: Check if tag already exists in subrepo
-        id: tagcheck
-        run: |
-          git ls-remote --tags dist v${{ steps.ver.outputs.VERSION }} | grep -q "refs/tags/v${{ steps.ver.outputs.VERSION }}$" \
-            && echo "EXISTS=true" >> $GITHUB_OUTPUT \
-            || echo "EXISTS=false" >> $GITHUB_OUTPUT
-
-      - name: Create Git tag in subrepo (only if missing)
-        if: steps.tagcheck.outputs.EXISTS == 'false'
-        run: |
-          git push dist split-jwmatrixbuttons:refs/tags/v${{ steps.ver.outputs.VERSION }}
-
-      - name: Create GitHub Release in subrepo (only if missing)
-        if: steps.tagcheck.outputs.EXISTS == 'false'
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: JW-Control/JWMatrixButtons
-          tag_name: v${{ steps.ver.outputs.VERSION }}
-          name: JWMatrixButtons v${{ steps.ver.outputs.VERSION }}
-          generate_release_notes: true
+      - name: Clone subrepo and create tag/release if missing
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
+          GH_TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -e
+
+          # Clonar el subrepo ya autenticado (PAT vía GH_TOKEN lo maneja gh y también el git)
+          rm -rf _distrepo
+          git clone https://github.com/JW-Control/JWMatrixButtons.git _distrepo
+          cd _distrepo
+          git checkout main
+          git pull
+
+          # Verificar tag
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists. Skipping tag creation."
+          else
+            echo "Creating tag $TAG"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+
+          # Crear release si no existe
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Skipping release creation."
+          else
+            echo "Creating GitHub Release $TAG"
+            gh release create "$TAG" \
+              --title "JWMatrixButtons $TAG" \
+              --notes "Release $TAG (version=$VERSION)."
+          fi
