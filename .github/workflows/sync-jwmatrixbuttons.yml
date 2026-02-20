@@ -2,7 +2,7 @@ name: Sync JWMatrixButtons + Auto Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
       - "libraries/JWMatrixButtons/**"
       - ".github/workflows/sync-jwmatrixbuttons.yml"
@@ -12,9 +12,9 @@ jobs:
   sync:
     runs-on: ubuntu-latest
 
-    # Permisos del GITHUB_TOKEN (no es el PAT). Igual es buena práctica dejarlo explícito.
+    # Permisos del GITHUB_TOKEN (NO es tu PAT). Igual dejamos explícito.
     permissions:
-      contents: write
+      contents: read
 
     steps:
       # 1) Checkout del monorepo SIN dejar credenciales del github-actions[bot]
@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # 2) Identidad de git para commits/tags locales (si aplicara)
+      # 2) Identidad local (para tags/commits locales si hiciera falta)
       - name: Configure git identity
         run: |
           git config user.name "JW-Control CI"
@@ -50,7 +50,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      # 4) Configurar remote dist usando PAT (ESTO ES LA CLAVE)
+      # 4) Configurar remote dist usando PAT (clave para poder pushear al subrepo)
       - name: Add distribution remote (PAT)
         shell: bash
         env:
@@ -74,23 +74,27 @@ jobs:
         run: |
           git push dist split-jwmatrixbuttons:main --force
 
-      # 7) Crear tag y GitHub Release en el subrepo (si no existe)
+      # 7) Tag + Release en el subrepo (si no existe)
       - name: Create tag + release in subrepo (only if missing)
         shell: bash
         env:
+          TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
           GH_TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
           TAG: ${{ steps.ver.outputs.tag }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          set -e
+          set -euo pipefail
 
+          # Clonar el subrepo autenticado (así origin queda con permisos)
           rm -rf _distrepo
-          git clone "https://github.com/JW-Control/JWMatrixButtons.git" _distrepo
+          git clone "https://x-access-token:${TOKEN}@github.com/JW-Control/JWMatrixButtons.git" _distrepo
           cd _distrepo
-          git checkout main
-          git pull
 
-          # Tag
+          git checkout main
+          git pull origin main
+          git fetch --tags
+
+          # Tag (si falta)
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists. Skipping tag creation."
           else
@@ -99,7 +103,7 @@ jobs:
             git push origin "$TAG"
           fi
 
-          # Release
+          # Release (si falta)
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists. Skipping release creation."
           else
