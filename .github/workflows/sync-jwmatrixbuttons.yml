@@ -12,17 +12,25 @@ jobs:
   sync:
     runs-on: ubuntu-latest
 
+    # Permisos del GITHUB_TOKEN (no es el PAT). Igual es buena práctica dejarlo explícito.
+    permissions:
+      contents: write
+
     steps:
+      # 1) Checkout del monorepo SIN dejar credenciales del github-actions[bot]
       - name: Checkout monorepo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
+      # 2) Identidad de git para commits/tags locales (si aplicara)
       - name: Configure git identity
         run: |
           git config user.name "JW-Control CI"
           git config user.email "jw.control.peru@gmail.com"
 
+      # 3) Leer versión desde library.properties
       - name: Extract version from library.properties
         id: ver
         shell: bash
@@ -32,35 +40,42 @@ jobs:
             echo "ERROR: $PROP not found"
             exit 1
           fi
+
           VERSION=$(grep -E '^version=' "$PROP" | head -n1 | cut -d'=' -f2 | tr -d ' \r')
           if [ -z "$VERSION" ]; then
             echo "ERROR: version= not found in $PROP"
             exit 1
           fi
+
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Add distribution remote
-        run: |
-          git remote remove dist || true
-          git remote add dist https://github.com/JW-Control/JWMatrixButtons.git
-
-      - name: Use PAT for GitHub HTTPS pushes
+      # 4) Configurar remote dist usando PAT (ESTO ES LA CLAVE)
+      - name: Add distribution remote (PAT)
         shell: bash
         env:
           TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
         run: |
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          if [ -z "$TOKEN" ]; then
+            echo "ERROR: DIST_PUSH_TOKEN is empty/not set"
+            exit 1
+          fi
 
+          git remote remove dist || true
+          git remote add dist "https://x-access-token:${TOKEN}@github.com/JW-Control/JWMatrixButtons.git"
+
+      # 5) Subtree split del folder de la librería
       - name: Subtree split
         run: |
           git subtree split --prefix=libraries/JWMatrixButtons -b split-jwmatrixbuttons
 
+      # 6) Push del subtree al subrepo (main)
       - name: Push subtree to subrepo (main)
         run: |
           git push dist split-jwmatrixbuttons:main --force
 
-      - name: Clone subrepo and create tag/release if missing
+      # 7) Crear tag y GitHub Release en el subrepo (si no existe)
+      - name: Create tag + release in subrepo (only if missing)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
@@ -69,14 +84,13 @@ jobs:
         run: |
           set -e
 
-          # Clonar el subrepo ya autenticado (PAT vía GH_TOKEN lo maneja gh y también el git)
           rm -rf _distrepo
-          git clone https://github.com/JW-Control/JWMatrixButtons.git _distrepo
+          git clone "https://github.com/JW-Control/JWMatrixButtons.git" _distrepo
           cd _distrepo
           git checkout main
           git pull
 
-          # Verificar tag
+          # Tag
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists. Skipping tag creation."
           else
@@ -85,7 +99,7 @@ jobs:
             git push origin "$TAG"
           fi
 
-          # Crear release si no existe
+          # Release
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists. Skipping release creation."
           else
