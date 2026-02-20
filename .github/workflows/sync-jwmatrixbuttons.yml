@@ -6,18 +6,15 @@ on:
     paths:
       - "libraries/JWMatrixButtons/**"
 
-permissions:
-  contents: read
-
 jobs:
   sync:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Configure git identity
         run: |
@@ -28,16 +25,14 @@ jobs:
         id: ver
         run: |
           VERSION=$(grep '^version=' libraries/JWMatrixButtons/library.properties | cut -d'=' -f2 | tr -d '\r' | xargs)
-          if [ -z "$VERSION" ]; then
-            echo "version= not found in libraries/JWMatrixButtons/library.properties"
-            exit 1
-          fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected VERSION=$VERSION"
 
       - name: Add distribution remote (token)
         run: |
+          git remote remove dist 2>/dev/null || true
           git remote add dist https://x-access-token:${{ secrets.DIST_PUSH_TOKEN }}@github.com/JW-Control/JWMatrixButtons.git
+          git remote -v
 
       - name: Subtree split
         run: |
