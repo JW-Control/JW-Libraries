@@ -1,0 +1,108 @@
+name: Sync JW_MatrixButtons + Auto Release
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "libraries/JW_MatrixButtons/library.properties"
+      - ".github/workflows/sync-jw-matrixbuttons.yml"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    # Permisos del GITHUB_TOKEN (no es el PAT). Buena práctica dejarlo explícito.
+    permissions:
+      contents: write
+
+    steps:
+      # 1) Checkout del monorepo SIN credenciales del github-actions[bot]
+      - name: Checkout monorepo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # 2) Identidad de git (para operaciones locales en este repo)
+      - name: Configure git identity
+        run: |
+          git config user.name "JW-Control CI"
+          git config user.email "jw.control.peru@gmail.com"
+
+      # 3) Leer versión desde library.properties
+      - name: Extract version from library.properties
+        id: ver
+        shell: bash
+        run: |
+          PROP="libraries/JW_MatrixButtons/library.properties"
+          if [ ! -f "$PROP" ]; then
+            echo "ERROR: $PROP not found"
+            exit 1
+          fi
+
+          VERSION=$(grep -E '^version=' "$PROP" | head -n1 | cut -d'=' -f2 | tr -d ' \r')
+          if [ -z "$VERSION" ]; then
+            echo "ERROR: version= not found in $PROP"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      # 4) Configurar remote dist usando PAT (CLAVE: el remote ya va autenticado)
+      - name: Add distribution remote (PAT)
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "ERROR: DIST_PUSH_TOKEN is empty/not set"
+            exit 1
+          fi
+
+          git remote remove dist || true
+          git remote add dist "https://x-access-token:${TOKEN}@github.com/JW-Control/JW_MatrixButtons.git"
+
+      # 5) Subtree split del folder de la librería
+      - name: Subtree split
+        id: split
+        shell: bash
+        run: |
+          git subtree split --prefix=libraries/JW_MatrixButtons -b split-jw-matrixbuttons
+          SHA=$(git rev-parse split-jw-matrixbuttons)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Split commit SHA: $SHA"
+
+      # 6) Push del subtree al subrepo (main)
+      - name: Push subtree to subrepo (main)
+        run: |
+          git push dist split-jw-matrixbuttons:main --force
+
+      # 7) Crear GitHub Release (esto crea el TAG remoto si no existe)
+      - name: Create GitHub Release in subrepo (only if missing)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.DIST_PUSH_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.split.outputs.sha }}
+        run: |
+          set -e
+
+          echo "Repo: JW-Control/JW_MatrixButtons"
+          echo "TAG:  $TAG"
+          echo "SHA:  $SHA"
+
+          # Si ya existe el release, no hacer nada
+          if gh release view "$TAG" -R "JW-Control/JW_MatrixButtons" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Skipping."
+            exit 0
+          fi
+
+          # Crear release y tag remoto apuntando al commit exacto que acabas de pushear
+          gh release create "$TAG" \
+            -R "JW-Control/JW_MatrixButtons" \
+            --target "$SHA" \
+            --title "JW_MatrixButtons $TAG" \
+            --notes "Release $TAG (version=$VERSION)."
