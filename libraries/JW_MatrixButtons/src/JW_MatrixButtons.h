@@ -3,9 +3,9 @@
 
 // Opcional: soporte de task en ESP32 (FreeRTOS)
 #if defined(ARDUINO_ARCH_ESP32)
-  #include "freertos/FreeRTOS.h"
-  #include "freertos/task.h"
-  #include "freertos/semphr.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 #endif
 
 class JW_MatrixButtons
@@ -86,6 +86,13 @@ public:
   bool isDown(uint8_t id) const;
   bool pressed(uint8_t id) const;  // consume 1 PRESS pendiente
   bool released(uint8_t id) const; // consume 1 RELEASE pendiente
+
+  // Limpieza de estados/eventos pendientes
+  void clearPendingPresses() const;  // limpia los PRESS latcheados que aún no fueron consumidos por pressed()
+  void clearPendingReleases() const; // limpia los RELEASE latcheados
+  void clearPendingRepeats() const;  // vacía la cola interna de repeat pendiente
+  void clearEventQueue() const;      // limpia _events del último update()
+  void clearPendingInput() const;    // helper general que llama a las cuatro anteriores
 
   // Helper genérico de “eje”
   // - circularWrapOnPress: si estás en max y haces INC (PRESS) => salta a min (y viceversa)

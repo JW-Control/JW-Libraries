@@ -290,6 +290,51 @@ bool JW_MatrixButtons::released(uint8_t id) const
   return ok;
 }
 
+void JW_MatrixButtons::clearPendingPresses() const {
+  lock();
+  for (uint8_t i = 0; i < _btnCount; i++) {
+    _pressPend[i] = 0;
+  }
+  unlock();
+}
+
+void JW_MatrixButtons::clearPendingReleases() const {
+  lock();
+  for (uint8_t i = 0; i < _btnCount; i++) {
+    _releasePend[i] = 0;
+  }
+  unlock();
+}
+
+void JW_MatrixButtons::clearPendingRepeats() const {
+  lock();
+  for (uint8_t i = 0; i < _btnCount; i++) {
+    _repHead[i] = 0;
+    _repTail[i] = 0;
+    _repCountPend[i] = 0;
+  }
+  unlock();
+}
+
+void JW_MatrixButtons::clearEventQueue() const {
+  lock();
+  _evN = 0;
+  unlock();
+}
+
+void JW_MatrixButtons::clearPendingInput() const {
+  lock();
+  for (uint8_t i = 0; i < _btnCount; i++) {
+    _pressPend[i] = 0;
+    _releasePend[i] = 0;
+    _repHead[i] = 0;
+    _repTail[i] = 0;
+    _repCountPend[i] = 0;
+  }
+  _evN = 0;
+  unlock();
+}
+
 // =========================
 // Core scanning
 // =========================
