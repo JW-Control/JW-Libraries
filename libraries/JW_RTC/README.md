@@ -1,21 +1,21 @@
-# JW_RTC
-
 RTC library for **DS3232M / DS3232** with a clean JW-style API.
 
-## Version 1.0.0 scope
+## Version 1.0.1 scope
 
-This first version is designed for the **JWPLC package** and uses `jwplc_i2c_bridge` internally.
+This version is designed for the **JWPLC package** and uses `jwplc_i2c_bridge` internally.
 
-That means:
+It adds cleaner public aliases so sketches can look more natural in Arduino style.
 
-- it works naturally inside the JWPLC environment
-- it does **not** depend on `TimeLib`
-- it provides a direct `DateTime` API
-- a future version will add a `Wire` backend for generic Arduino/ESP32 boards
+Examples:
+- `JWRTCDateTime`
+- `JWRTCAlarm1Config`
+- `JWRTCAlarm2Config`
+- `JWRTCError`
 
 ## Main features
 
-- Clean `DateTime` struct
+- Clean `DateTime` API
+- Friendly aliases like `JWRTCDateTime`
 - Read/write date and time
 - Unix timestamp conversion
 - RTC validity check (`OSF`)
@@ -40,7 +40,7 @@ void setup() {
     return;
   }
 
-  JW_RTC::DateTime dt;
+  JWRTCDateTime dt;
   if (rtc.read(dt)) {
     Serial.print(dt.year);
     Serial.print("/");
@@ -52,3 +52,43 @@ void setup() {
 
 void loop() {
 }
+```
+
+## DateTime struct
+
+```cpp
+JWRTCDateTime dt;
+dt.year = 2026;
+dt.month = 4;
+dt.day = 19;
+dt.hour = 23;
+dt.minute = 45;
+dt.second = 0;
+dt.dayOfWeek = 0; // optional, auto-calculated on write
+```
+
+## NVRAM access
+
+```cpp
+uint8_t value = 42;
+rtc.nvramWriteByte(0, value);
+
+uint8_t out = 0;
+rtc.nvramReadByte(0, out);
+```
+
+## Error handling
+
+```cpp
+if (!rtc.read(dt)) {
+  Serial.println(JW_RTC::errorToString(rtc.lastError()));
+}
+```
+
+## Notes
+
+- Year range is `2000..2099`
+- `dayOfWeek` uses `1=Sunday ... 7=Saturday`
+- `dayOfWeek = 0` on write means auto-calculate
+- v1.0.1 uses `jwplc_i2c_bridge`
+- a future release will add `Wire` support

@@ -2,7 +2,7 @@
 
 JW_RTC rtc;
 
-void printDateTime(const JW_RTC::DateTime& dt)
+void printDateTime(const JWRTCDateTime& dt)
 {
   Serial.print(dt.year);
   Serial.print('/');
@@ -40,7 +40,7 @@ void setup()
 
 void loop()
 {
-  JW_RTC::DateTime dt;
+  JWRTCDateTime dt;
   float tempC = 0.0f;
 
   if (rtc.read(dt))

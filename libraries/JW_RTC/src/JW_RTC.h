@@ -228,4 +228,15 @@ private:
     void setError(Error error);
 };
 
+// =====================================================
+// Aliases amigables tipo Arduino / JW
+// =====================================================
+using JWRTCDateTime       = JW_RTC::DateTime;
+using JWRTCAlarm1Config   = JW_RTC::Alarm1Config;
+using JWRTCAlarm2Config   = JW_RTC::Alarm2Config;
+using JWRTCError          = JW_RTC::Error;
+using JWRTCSquareWaveMode = JW_RTC::SquareWaveMode;
+using JWRTCAlarm1Mode     = JW_RTC::Alarm1Mode;
+using JWRTCAlarm2Mode     = JW_RTC::Alarm2Mode;
+
 #endif

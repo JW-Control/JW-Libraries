@@ -14,7 +14,7 @@ void setup()
     return;
   }
 
-  JW_RTC::DateTime dt;
+  JWRTCDateTime dt;
   if (!JW_RTC::fromBuildTime(__DATE__, __TIME__, dt))
   {
     Serial.println("Build time parse failed");

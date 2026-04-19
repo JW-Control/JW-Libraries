@@ -1,10 +1,16 @@
-
----
-
-## `CHANGELOG.md`
-
-```md
 # Changelog
+
+## 1.0.1
+- Added friendlier public aliases:
+  - `JWRTCDateTime`
+  - `JWRTCAlarm1Config`
+  - `JWRTCAlarm2Config`
+  - `JWRTCError`
+  - `JWRTCSquareWaveMode`
+  - `JWRTCAlarm1Mode`
+  - `JWRTCAlarm2Mode`
+- No backend changes
+- No functional changes to RTC access logic
 
 ## 1.0.0
 - Initial public release
