@@ -89,6 +89,87 @@ bool JW_FRAM::begin(uint32_t forcedSizeBytes) {
   return true;
 }
 
+void JW_FRAM::setBusLockCallbacks(JW_FRAM_BusLockCallback lockCallback,
+                                  JW_FRAM_BusUnlockCallback unlockCallback,
+                                  void *userData,
+                                  uint32_t timeoutMs) {
+  _busLockCallback = lockCallback;
+  _busUnlockCallback = unlockCallback;
+  _busLockUserData = userData;
+  _busLockTimeoutMs = timeoutMs;
+}
+
+void JW_FRAM::clearBusLockCallbacks() {
+  _busLockCallback = nullptr;
+  _busUnlockCallback = nullptr;
+  _busLockUserData = nullptr;
+  _busLockTimeoutMs = 50;
+}
+
+bool JW_FRAM::lockBus() {
+  if (_busLockCallback == nullptr) {
+    return true;
+  }
+
+  return _busLockCallback(_busLockTimeoutMs, _busLockUserData);
+}
+
+void JW_FRAM::unlockBus() {
+  if (_busUnlockCallback != nullptr) {
+    _busUnlockCallback(_busLockUserData);
+  }
+}
+
+bool JW_FRAM::spiWrite(const uint8_t *buffer, size_t len) {
+  if (_spi_dev == nullptr) {
+    return false;
+  }
+
+  if (!lockBus()) {
+    debugPrint(F("JW_FRAM::spiWrite() no se pudo bloquear el bus SPI"));
+    return false;
+  }
+
+  const bool ok = _spi_dev->write(buffer, len);
+  unlockBus();
+
+  return ok;
+}
+
+bool JW_FRAM::spiWrite(const uint8_t *buffer, size_t len,
+                       const uint8_t *prefixBuffer, size_t prefixLen) {
+  if (_spi_dev == nullptr) {
+    return false;
+  }
+
+  if (!lockBus()) {
+    debugPrint(F("JW_FRAM::spiWrite() no se pudo bloquear el bus SPI"));
+    return false;
+  }
+
+  const bool ok = _spi_dev->write(buffer, len, prefixBuffer, prefixLen);
+  unlockBus();
+
+  return ok;
+}
+
+bool JW_FRAM::spiWriteThenRead(const uint8_t *writeBuffer, size_t writeLen,
+                               uint8_t *readBuffer, size_t readLen) {
+  if (_spi_dev == nullptr) {
+    return false;
+  }
+
+  if (!lockBus()) {
+    debugPrint(F("JW_FRAM::spiWriteThenRead() no se pudo bloquear el bus SPI"));
+    return false;
+  }
+
+  const bool ok = _spi_dev->write_then_read(writeBuffer, writeLen, readBuffer, readLen);
+  unlockBus();
+
+  return ok;
+}
+
 uint32_t JW_FRAM::size() const { return _framSizeBytes; }
 
 uint8_t JW_FRAM::addressSize() const { return _addressSizeBytes; }
@@ -112,7 +193,7 @@ bool JW_FRAM::isAddressValid(uint32_t addr, size_t len) const {
 
 bool JW_FRAM::writeEnable(bool enable) {
   uint8_t cmd = enable ? JW_FRAM_OPCODE_WREN : JW_FRAM_OPCODE_WRDI;
-  return _spi_dev->write(&cmd, 1);
+  return spiWrite(&cmd, 1);
 }
 
 bool JW_FRAM::write8(uint32_t addr, uint8_t value) {
@@ -132,7 +213,7 @@ bool JW_FRAM::write8(uint32_t addr, uint8_t value) {
   buffer[i++] = static_cast<uint8_t>(addr & 0xFF);
   buffer[i++] = value;
 
-  return _spi_dev->write(buffer, i);
+  return spiWrite(buffer, i);
 }
 
 uint8_t JW_FRAM::read8(uint32_t addr) {
@@ -152,7 +233,7 @@ uint8_t JW_FRAM::read8(uint32_t addr) {
   buffer[i++] = static_cast<uint8_t>(addr >> 8);
   buffer[i++] = static_cast<uint8_t>(addr & 0xFF);
 
-  if (!_spi_dev->write_then_read(buffer, i, &value, 1)) {
+  if (!spiWriteThenRead(buffer, i, &value, 1)) {
     debugPrint(F("JW_FRAM::read8() fallo de lectura SPI"));
     return 0;
   }
@@ -180,7 +261,7 @@ bool JW_FRAM::write(uint32_t addr, const uint8_t *values, size_t count) {
   prebuf[i++] = static_cast<uint8_t>(addr >> 8);
   prebuf[i++] = static_cast<uint8_t>(addr & 0xFF);
 
-  return _spi_dev->write(values, count, prebuf, i);
+  return spiWrite(values, count, prebuf, i);
 }
 
 bool JW_FRAM::read(uint32_t addr, uint8_t *values, size_t count) {
@@ -203,7 +284,7 @@ bool JW_FRAM::read(uint32_t addr, uint8_t *values, size_t count) {
   buffer[i++] = static_cast<uint8_t>(addr >> 8);
   buffer[i++] = static_cast<uint8_t>(addr & 0xFF);
 
-  return _spi_dev->write_then_read(buffer, i, values, count);
+  return spiWriteThenRead(buffer, i, values, count);
 }
 
 bool JW_FRAM::getDeviceID(uint8_t *manufacturerID, uint16_t *productID) {
@@ -215,7 +296,7 @@ bool JW_FRAM::getDeviceID(uint8_t *manufacturerID, uint16_t *productID) {
   uint8_t cmd = JW_FRAM_OPCODE_RDID;
   uint8_t rx[4] = {0, 0, 0, 0};
 
-  if (!_spi_dev->write_then_read(&cmd, 1, rx, 4)) {
+  if (!spiWriteThenRead(&cmd, 1, rx, 4)) {
     return false;
   }
 
@@ -234,7 +315,7 @@ uint8_t JW_FRAM::getStatusRegister() {
   uint8_t cmd = JW_FRAM_OPCODE_RDSR;
   uint8_t val = 0;
 
-  if (!_spi_dev->write_then_read(&cmd, 1, &val, 1)) {
+  if (!spiWriteThenRead(&cmd, 1, &val, 1)) {
     debugPrint(F("JW_FRAM::getStatusRegister() fallo de lectura SPI"));
     return 0;
   }
@@ -246,7 +327,7 @@ bool JW_FRAM::setStatusRegister(uint8_t value) {
   uint8_t cmd[2];
   cmd[0] = JW_FRAM_OPCODE_WRSR;
   cmd[1] = value;
-  return _spi_dev->write(cmd, 2);
+  return spiWrite(cmd, 2);
 }
 
 void JW_FRAM::setAddressSize(uint8_t nAddressSize) {

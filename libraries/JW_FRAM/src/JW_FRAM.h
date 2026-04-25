@@ -8,25 +8,31 @@
 #include <type_traits>
 
 /** Códigos de operación SPI FRAM */
-typedef enum jw_fram_opcodes_e {
-  JW_FRAM_OPCODE_WREN  = 0b0110,    /* Write Enable Latch */
-  JW_FRAM_OPCODE_WRDI  = 0b0100,    /* Reset Write Enable Latch */
-  JW_FRAM_OPCODE_RDSR  = 0b0101,    /* Read Status Register */
-  JW_FRAM_OPCODE_WRSR  = 0b0001,    /* Write Status Register */
-  JW_FRAM_OPCODE_READ  = 0b0011,    /* Read Memory */
-  JW_FRAM_OPCODE_WRITE = 0b0010,    /* Write Memory */
-  JW_FRAM_OPCODE_RDID  = 0b10011111 /* Read Device ID */
+typedef enum jw_fram_opcodes_e
+{
+  JW_FRAM_OPCODE_WREN = 0b0110,    /* Write Enable Latch */
+  JW_FRAM_OPCODE_WRDI = 0b0100,    /* Reset Write Enable Latch */
+  JW_FRAM_OPCODE_RDSR = 0b0101,    /* Read Status Register */
+  JW_FRAM_OPCODE_WRSR = 0b0001,    /* Write Status Register */
+  JW_FRAM_OPCODE_READ = 0b0011,    /* Read Memory */
+  JW_FRAM_OPCODE_WRITE = 0b0010,   /* Write Memory */
+  JW_FRAM_OPCODE_RDID = 0b10011111 /* Read Device ID */
 } JW_FRAM_Opcode;
+
+typedef bool (*JW_FRAM_BusLockCallback)(uint32_t timeoutMs, void *userData);
+typedef void (*JW_FRAM_BusUnlockCallback)(void *userData);
 
 /**
  * @brief Librería SPI FRAM con API de bajo nivel y API de alto nivel estilo EEPROM.
  */
-class JW_FRAM {
+class JW_FRAM
+{
 public:
   static constexpr uint8_t MAX_TEXT_LENGTH = 127;
   static constexpr uint16_t BLOCK_MAGIC = 0x4A57; // "JW"
 
-  struct BlockHeader {
+  struct BlockHeader
+  {
     uint16_t magic;
     uint8_t version;
     uint8_t reserved;
@@ -78,6 +84,13 @@ public:
   template <typename T>
   bool readBlock(uint32_t addr, T &value, uint8_t expectedVersion = 1);
 
+  void setBusLockCallbacks(JW_FRAM_BusLockCallback lockCallback,
+                           JW_FRAM_BusUnlockCallback unlockCallback,
+                           void *userData = nullptr,
+                           uint32_t timeoutMs = 50);
+
+  void clearBusLockCallbacks();
+
   void enableDebug(Stream &port);
   void disableDebug();
   bool debugEnabled() const;
@@ -89,6 +102,20 @@ private:
   Stream *_debugPort = nullptr;
   bool _debugEnabled = false;
 
+  JW_FRAM_BusLockCallback _busLockCallback = nullptr;
+  JW_FRAM_BusUnlockCallback _busUnlockCallback = nullptr;
+  void *_busLockUserData = nullptr;
+  uint32_t _busLockTimeoutMs = 50;
+
+  bool lockBus();
+  void unlockBus();
+
+  bool spiWrite(const uint8_t *buffer, size_t len);
+  bool spiWrite(const uint8_t *buffer, size_t len,
+                const uint8_t *prefixBuffer, size_t prefixLen);
+  bool spiWriteThenRead(const uint8_t *writeBuffer, size_t writeLen,
+                        uint8_t *readBuffer, size_t readLen);
+
   void debugPrint(const __FlashStringHelper *msg);
   void debugPrint(const String &msg);
   void debugPrint(const char *msg);
@@ -97,11 +124,13 @@ private:
 };
 
 template <typename T>
-bool JW_FRAM::get(uint32_t addr, T &value) {
+bool JW_FRAM::get(uint32_t addr, T &value)
+{
   static_assert(std::is_trivially_copyable<T>::value,
                 "JW_FRAM::get<T>() requiere un tipo trivially copyable");
 
-  if (!isAddressValid(addr, sizeof(T))) {
+  if (!isAddressValid(addr, sizeof(T)))
+  {
     debugPrint(F("JW_FRAM::get() direccion fuera de rango"));
     return false;
   }
@@ -110,27 +139,32 @@ bool JW_FRAM::get(uint32_t addr, T &value) {
 }
 
 template <typename T>
-bool JW_FRAM::put(uint32_t addr, const T &value) {
+bool JW_FRAM::put(uint32_t addr, const T &value)
+{
   static_assert(std::is_trivially_copyable<T>::value,
                 "JW_FRAM::put<T>() requiere un tipo trivially copyable");
 
-  if (!isAddressValid(addr, sizeof(T))) {
+  if (!isAddressValid(addr, sizeof(T)))
+  {
     debugPrint(F("JW_FRAM::put() direccion fuera de rango"));
     return false;
   }
 
-  if (!writeEnable(true)) {
+  if (!writeEnable(true))
+  {
     debugPrint(F("JW_FRAM::put() fallo al habilitar escritura"));
     return false;
   }
 
   const bool ok = write(addr, reinterpret_cast<const uint8_t *>(&value), sizeof(T));
 
-  if (!writeEnable(false)) {
+  if (!writeEnable(false))
+  {
     debugPrint(F("JW_FRAM::put() fallo al deshabilitar escritura"));
   }
 
-  if (!ok) {
+  if (!ok)
+  {
     debugPrint(F("JW_FRAM::put() fallo de escritura"));
   }
 
@@ -138,16 +172,19 @@ bool JW_FRAM::put(uint32_t addr, const T &value) {
 }
 
 template <typename T>
-bool JW_FRAM::update(uint32_t addr, const T &value) {
+bool JW_FRAM::update(uint32_t addr, const T &value)
+{
   static_assert(std::is_trivially_copyable<T>::value,
                 "JW_FRAM::update<T>() requiere un tipo trivially copyable");
 
   T current{};
-  if (!get(addr, current)) {
+  if (!get(addr, current))
+  {
     return false;
   }
 
-  if (memcmp(&current, &value, sizeof(T)) == 0) {
+  if (memcmp(&current, &value, sizeof(T)) == 0)
+  {
     return true;
   }
 
@@ -155,14 +192,16 @@ bool JW_FRAM::update(uint32_t addr, const T &value) {
 }
 
 template <typename T>
-bool JW_FRAM::writeBlock(uint32_t addr, const T &value, uint8_t version) {
+bool JW_FRAM::writeBlock(uint32_t addr, const T &value, uint8_t version)
+{
   static_assert(std::is_trivially_copyable<T>::value,
                 "JW_FRAM::writeBlock<T>() requiere un tipo trivially copyable");
   static_assert(sizeof(T) <= 0xFFFF,
                 "JW_FRAM::writeBlock<T>() excede el tamano permitido por uint16_t");
 
   const size_t totalSize = sizeof(BlockHeader) + sizeof(T);
-  if (!isAddressValid(addr, totalSize)) {
+  if (!isAddressValid(addr, totalSize))
+  {
     debugPrint(F("JW_FRAM::writeBlock() direccion fuera de rango"));
     return false;
   }
@@ -174,21 +213,25 @@ bool JW_FRAM::writeBlock(uint32_t addr, const T &value, uint8_t version) {
   header.length = static_cast<uint16_t>(sizeof(T));
   header.checksum = computeChecksum(reinterpret_cast<const uint8_t *>(&value), sizeof(T));
 
-  if (!writeEnable(true)) {
+  if (!writeEnable(true))
+  {
     debugPrint(F("JW_FRAM::writeBlock() fallo al habilitar escritura"));
     return false;
   }
 
   bool ok = write(addr, reinterpret_cast<const uint8_t *>(&header), sizeof(header));
-  if (ok) {
+  if (ok)
+  {
     ok = write(addr + sizeof(header), reinterpret_cast<const uint8_t *>(&value), sizeof(T));
   }
 
-  if (!writeEnable(false)) {
+  if (!writeEnable(false))
+  {
     debugPrint(F("JW_FRAM::writeBlock() fallo al deshabilitar escritura"));
   }
 
-  if (!ok) {
+  if (!ok)
+  {
     debugPrint(F("JW_FRAM::writeBlock() fallo de escritura"));
   }
 
@@ -196,40 +239,47 @@ bool JW_FRAM::writeBlock(uint32_t addr, const T &value, uint8_t version) {
 }
 
 template <typename T>
-bool JW_FRAM::readBlock(uint32_t addr, T &value, uint8_t expectedVersion) {
+bool JW_FRAM::readBlock(uint32_t addr, T &value, uint8_t expectedVersion)
+{
   static_assert(std::is_trivially_copyable<T>::value,
                 "JW_FRAM::readBlock<T>() requiere un tipo trivially copyable");
   static_assert(sizeof(T) <= 0xFFFF,
                 "JW_FRAM::readBlock<T>() excede el tamano permitido por uint16_t");
 
   const size_t totalSize = sizeof(BlockHeader) + sizeof(T);
-  if (!isAddressValid(addr, totalSize)) {
+  if (!isAddressValid(addr, totalSize))
+  {
     debugPrint(F("JW_FRAM::readBlock() direccion fuera de rango"));
     return false;
   }
 
   BlockHeader header{};
-  if (!read(addr, reinterpret_cast<uint8_t *>(&header), sizeof(header))) {
+  if (!read(addr, reinterpret_cast<uint8_t *>(&header), sizeof(header)))
+  {
     debugPrint(F("JW_FRAM::readBlock() fallo al leer header"));
     return false;
   }
 
-  if (header.magic != BLOCK_MAGIC) {
+  if (header.magic != BLOCK_MAGIC)
+  {
     debugPrint(F("JW_FRAM::readBlock() magic invalido"));
     return false;
   }
 
-  if (header.version != expectedVersion) {
+  if (header.version != expectedVersion)
+  {
     debugPrint(F("JW_FRAM::readBlock() version incompatible"));
     return false;
   }
 
-  if (header.length != sizeof(T)) {
+  if (header.length != sizeof(T))
+  {
     debugPrint(F("JW_FRAM::readBlock() tamano de payload incompatible"));
     return false;
   }
 
-  if (!read(addr + sizeof(header), reinterpret_cast<uint8_t *>(&value), sizeof(T))) {
+  if (!read(addr + sizeof(header), reinterpret_cast<uint8_t *>(&value), sizeof(T)))
+  {
     debugPrint(F("JW_FRAM::readBlock() fallo al leer payload"));
     return false;
   }
@@ -237,7 +287,8 @@ bool JW_FRAM::readBlock(uint32_t addr, T &value, uint8_t expectedVersion) {
   const uint16_t checksum =
       computeChecksum(reinterpret_cast<const uint8_t *>(&value), sizeof(T));
 
-  if (checksum != header.checksum) {
+  if (checksum != header.checksum)
+  {
     debugPrint(F("JW_FRAM::readBlock() checksum invalido"));
     return false;
   }

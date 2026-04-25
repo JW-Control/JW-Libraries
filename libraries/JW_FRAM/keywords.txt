@@ -19,3 +19,5 @@ disableDebug	KEYWORD2
 size	KEYWORD2
 isAddressValid	KEYWORD2
 BlockHeader	KEYWORD3
+setBusLockCallbacks	KEYWORD2
+clearBusLockCallbacks	KEYWORD2
