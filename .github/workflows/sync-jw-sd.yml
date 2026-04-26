@@ -1,11 +1,11 @@
-name: Sync JW_FRAM + Auto Release
+name: Sync JW_SD + Auto Release
 
 on:
   push:
     branches: [ "main" ]
     paths:
-      - "libraries/JW_FRAM/library.properties"
-      - ".github/workflows/sync-jw-fram.yml"
+      - "libraries/JW_SD/library.properties"
+      - ".github/workflows/sync-jw-sd.yml"
   workflow_dispatch:
 
 jobs:
@@ -35,7 +35,7 @@ jobs:
         id: ver
         shell: bash
         run: |
-          PROP="libraries/JW_FRAM/library.properties"
+          PROP="libraries/JW_SD/library.properties"
           if [ ! -f "$PROP" ]; then
             echo "ERROR: $PROP not found"
             exit 1
@@ -62,22 +62,22 @@ jobs:
           fi
 
           git remote remove dist || true
-          git remote add dist "https://x-access-token:${TOKEN}@github.com/JW-Control/JW_FRAM.git"
+          git remote add dist "https://x-access-token:${TOKEN}@github.com/JW-Control/JW_SD.git"
 
       # 5) Subtree split del folder de la librería
       - name: Subtree split
         id: split
         shell: bash
         run: |
-          git subtree split --prefix=libraries/JW_FRAM -b split-jw-fram
-          SHA=$(git rev-parse split-jw-fram)
+          git subtree split --prefix=libraries/JW_SD -b split-jw-sd
+          SHA=$(git rev-parse split-jw-sd)
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Split commit SHA: $SHA"
 
       # 6) Push del subtree al subrepo (main)
       - name: Push subtree to subrepo (main)
         run: |
-          git push dist split-jw-fram:main --force
+          git push dist split-jw-sd:main --force
 
       # 7) Crear GitHub Release (esto crea el TAG remoto si no existe)
       - name: Create GitHub Release in subrepo (only if missing)
@@ -90,19 +90,19 @@ jobs:
         run: |
           set -e
 
-          echo "Repo: JW-Control/JW_FRAM"
+          echo "Repo: JW-Control/JW_SD"
           echo "TAG:  $TAG"
           echo "SHA:  $SHA"
 
           # Si ya existe el release, no hacer nada
-          if gh release view "$TAG" -R "JW-Control/JW_FRAM" >/dev/null 2>&1; then
+          if gh release view "$TAG" -R "JW-Control/JW_SD" >/dev/null 2>&1; then
             echo "Release $TAG already exists. Skipping."
             exit 0
           fi
 
           # Crear release y tag remoto apuntando al commit exacto que acabas de pushear
           gh release create "$TAG" \
-            -R "JW-Control/JW_FRAM" \
+            -R "JW-Control/JW_SD" \
             --target "$SHA" \
-            --title "JW_FRAM $TAG" \
+            --title "JW_SD $TAG" \
             --notes "Release $TAG (version=$VERSION)."
