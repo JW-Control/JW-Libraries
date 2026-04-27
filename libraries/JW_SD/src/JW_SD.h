@@ -14,6 +14,7 @@ class JW_SD;
 enum JW_SDError : uint8_t
 {
     JW_SD_OK = 0,
+    JW_SD_ERR_DISABLED,
     JW_SD_ERR_NO_CARD,
     JW_SD_ERR_LOCK_TIMEOUT,
     JW_SD_ERR_BEGIN_FAILED,
@@ -138,6 +139,9 @@ public:
     bool lock(uint32_t timeoutMs);
     void unlock();
 
+    void setEnabled(bool enabled);
+    bool isEnabled() const;
+
 private:
     friend class JWPLCFile;
 
@@ -149,6 +153,7 @@ private:
     bool _detectActiveLow;
     bool _detectUsePullup;
 
+    bool _enabled;
     bool _ready;
     bool _beginAttempted;
 

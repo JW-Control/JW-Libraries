@@ -312,6 +312,7 @@ JW_SD::JW_SD()
       _detectPin(-1),
       _detectActiveLow(true),
       _detectUsePullup(false),
+      _enabled(true),
       _ready(false),
       _beginAttempted(false),
       _lockCallback(nullptr),
@@ -390,6 +391,13 @@ bool JW_SD::begin()
 {
     _beginAttempted = true;
     _ready = false;
+
+    if (!_enabled)
+    {
+        setError(JW_SD_ERR_DISABLED);
+        return false;
+    }
+
     setError(JW_SD_OK);
 
     configureDetectPinIfNeeded();
@@ -449,6 +457,11 @@ bool JW_SD::isReady() const
 
 bool JW_SD::isCardPresent() const
 {
+    if (!_enabled)
+    {
+        return false;
+    }
+
     if (_detectPin < 0)
     {
         return true;
@@ -474,6 +487,8 @@ const char *JW_SD::lastErrorString() const
     {
     case JW_SD_OK:
         return "OK";
+    case JW_SD_ERR_DISABLED:
+        return "SD disabled";
     case JW_SD_ERR_NO_CARD:
         return "No card";
     case JW_SD_ERR_LOCK_TIMEOUT:
@@ -734,4 +749,26 @@ bool JW_SD::lockForOperation()
 void JW_SD::unlockForOperation()
 {
     unlock();
+}
+
+void JW_SD::setEnabled(bool enabled)
+{
+    _enabled = enabled;
+
+    if (!_enabled)
+    {
+        _ready = false;
+        setError(JW_SD_ERR_DISABLED);
+        return;
+    }
+
+    if (_lastError == JW_SD_ERR_DISABLED)
+    {
+        setError(JW_SD_OK);
+    }
+}
+
+bool JW_SD::isEnabled() const
+{
+    return _enabled;
 }
