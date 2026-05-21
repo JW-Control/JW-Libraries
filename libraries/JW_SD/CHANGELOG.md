@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- README actualizado
+
 ## 1.0.1
 
 - Agrega `setEnabled(bool)` para permitir habilitar/deshabilitar la SD desde perfiles de hardware.

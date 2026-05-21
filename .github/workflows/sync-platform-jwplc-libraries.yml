@@ -1,0 +1,342 @@
+name: Sync JW Libraries to platform-jwplc
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "platform-jwplc-sync.properties"
+      - "libraries/JW_MatrixButtons/library.properties"
+      - "libraries/JW_FRAM/library.properties"
+      - "libraries/JW_RTC/library.properties"
+      - "libraries/JW_SD/library.properties"
+      - ".github/workflows/sync-platform-jwplc-libraries.yml"
+
+  workflow_dispatch:
+    inputs:
+      base_branch:
+        description: "Rama base en platform-jwplc. Si se deja vacío, usa platform-jwplc-sync.properties."
+        required: false
+        default: ""
+      sync_branch:
+        description: "Rama sync en platform-jwplc. Si se deja vacío, usa platform-jwplc-sync.properties."
+        required: false
+        default: ""
+
+concurrency:
+  group: sync-platform-jwplc-libraries
+  cancel-in-progress: false
+
+jobs:
+  sync-platform:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout JW-Libraries
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure git identity
+        run: |
+          git config --global user.name "JW-Control CI"
+          git config --global user.email "jw.control.peru@gmail.com"
+
+      - name: Load sync configuration
+        id: cfg
+        shell: bash
+        env:
+          INPUT_BASE_BRANCH: ${{ github.event.inputs.base_branch }}
+          INPUT_SYNC_BRANCH: ${{ github.event.inputs.sync_branch }}
+        run: |
+          set -euo pipefail
+
+          CONFIG_FILE="platform-jwplc-sync.properties"
+
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "ERROR: $CONFIG_FILE not found"
+            exit 1
+          fi
+
+          # shellcheck disable=SC1090
+          source "$CONFIG_FILE"
+
+          if [ -n "${INPUT_BASE_BRANCH:-}" ]; then
+            PLATFORM_BASE_BRANCH="$INPUT_BASE_BRANCH"
+          fi
+
+          if [ -n "${INPUT_SYNC_BRANCH:-}" ]; then
+            PLATFORM_SYNC_BRANCH="$INPUT_SYNC_BRANCH"
+          fi
+
+          if [ -z "${PLATFORM_REPO:-}" ]; then
+            echo "ERROR: PLATFORM_REPO is empty"
+            exit 1
+          fi
+
+          if [ -z "${PLATFORM_BASE_BRANCH:-}" ]; then
+            echo "ERROR: PLATFORM_BASE_BRANCH is empty"
+            exit 1
+          fi
+
+          if [ -z "${PLATFORM_SYNC_BRANCH:-}" ]; then
+            echo "ERROR: PLATFORM_SYNC_BRANCH is empty"
+            exit 1
+          fi
+
+          if [ -z "${PLATFORM_LIBRARIES_PATH:-}" ]; then
+            echo "ERROR: PLATFORM_LIBRARIES_PATH is empty"
+            exit 1
+          fi
+
+          if [ -z "${LIBRARIES:-}" ]; then
+            echo "ERROR: LIBRARIES is empty"
+            exit 1
+          fi
+
+          echo "platform_repo=$PLATFORM_REPO" >> "$GITHUB_OUTPUT"
+          echo "base_branch=$PLATFORM_BASE_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "sync_branch=$PLATFORM_SYNC_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "platform_libraries_path=$PLATFORM_LIBRARIES_PATH" >> "$GITHUB_OUTPUT"
+          echo "libraries=$LIBRARIES" >> "$GITHUB_OUTPUT"
+
+          echo "PLATFORM_REPO=$PLATFORM_REPO"
+          echo "PLATFORM_BASE_BRANCH=$PLATFORM_BASE_BRANCH"
+          echo "PLATFORM_SYNC_BRANCH=$PLATFORM_SYNC_BRANCH"
+          echo "PLATFORM_LIBRARIES_PATH=$PLATFORM_LIBRARIES_PATH"
+          echo "LIBRARIES=$LIBRARIES"
+
+      - name: Validate source libraries and collect versions
+        id: versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LIBRARIES='${{ steps.cfg.outputs.libraries }}'
+
+          SUMMARY_FILE="jw_libraries_snapshot.md"
+
+          {
+            echo "# JW Libraries snapshot"
+            echo
+            echo "Origen:"
+            echo
+            echo '```txt'
+            echo "JW-Control/JW-Libraries"
+            echo "commit=${GITHUB_SHA}"
+            echo '```'
+            echo
+            echo "| Librería | Versión | Ruta origen |"
+            echo "|---|---:|---|"
+          } > "$SUMMARY_FILE"
+
+          for LIB in $LIBRARIES; do
+            SRC="libraries/$LIB"
+            PROP="$SRC/library.properties"
+
+            if [ ! -d "$SRC" ]; then
+              echo "ERROR: source library folder not found: $SRC"
+              exit 1
+            fi
+
+            if [ ! -f "$PROP" ]; then
+              echo "ERROR: library.properties not found: $PROP"
+              exit 1
+            fi
+
+            VERSION=$(grep -E '^version=' "$PROP" | head -n1 | cut -d'=' -f2 | tr -d ' \r')
+
+            if [ -z "$VERSION" ]; then
+              echo "ERROR: version= not found in $PROP"
+              exit 1
+            fi
+
+            echo "$LIB version=$VERSION"
+            echo "| \`$LIB\` | \`$VERSION\` | \`$SRC\` |" >> "$SUMMARY_FILE"
+          done
+
+          echo "summary_file=$SUMMARY_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout platform-jwplc base branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.cfg.outputs.platform_repo }}
+          ref: ${{ steps.cfg.outputs.base_branch }}
+          path: platform-jwplc
+          token: ${{ secrets.PLATFORM_PUSH_TOKEN }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare sync branch in platform-jwplc
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.PLATFORM_PUSH_TOKEN }}
+          PLATFORM_REPO: ${{ steps.cfg.outputs.platform_repo }}
+          BASE_BRANCH: ${{ steps.cfg.outputs.base_branch }}
+          SYNC_BRANCH: ${{ steps.cfg.outputs.sync_branch }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${TOKEN:-}" ]; then
+            echo "ERROR: DIST_PUSH_TOKEN is empty or not configured"
+            exit 1
+          fi
+
+          cd platform-jwplc
+
+          git remote set-url origin "https://x-access-token:${TOKEN}@github.com/${PLATFORM_REPO}.git"
+
+          git fetch origin "$BASE_BRANCH"
+
+          # La rama sync se regenera desde la rama base.
+          # Esto evita arrastrar cambios viejos o conflictos innecesarios.
+          git checkout -B "$SYNC_BRANCH" "origin/$BASE_BRANCH"
+
+      - name: Copy JW libraries into platform package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LIBRARIES='${{ steps.cfg.outputs.libraries }}'
+          DST_ROOT="platform-jwplc/${{ steps.cfg.outputs.platform_libraries_path }}"
+
+          mkdir -p "$DST_ROOT"
+
+          for LIB in $LIBRARIES; do
+            SRC="libraries/$LIB"
+            DST="$DST_ROOT/$LIB"
+
+            echo "Syncing $SRC -> $DST"
+
+            rm -rf "$DST"
+            mkdir -p "$DST"
+
+            rsync -a \
+              --delete \
+              --exclude ".git" \
+              --exclude ".github" \
+              --exclude ".DS_Store" \
+              --exclude "Thumbs.db" \
+              "$SRC/" "$DST/"
+          done
+
+      - name: Write snapshot report into platform docs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "platform-jwplc/docs"
+
+          {
+            cat "${{ steps.versions.outputs.summary_file }}"
+            echo
+            echo "Destino:"
+            echo
+            echo '```txt'
+            echo "${{ steps.cfg.outputs.platform_repo }}"
+            echo "base=${{ steps.cfg.outputs.base_branch }}"
+            echo "sync=${{ steps.cfg.outputs.sync_branch }}"
+            echo "path=${{ steps.cfg.outputs.platform_libraries_path }}"
+            echo '```'
+            echo
+            echo "Nota:"
+            echo
+            echo "Este archivo fue generado automáticamente desde JW-Libraries para registrar el snapshot de librerías incluido en el package JWPLC."
+          } > "platform-jwplc/docs/jw-libraries-snapshot.md"
+
+      - name: Commit changes in platform-jwplc sync branch
+        id: commit
+        shell: bash
+        env:
+          SYNC_BRANCH: ${{ steps.cfg.outputs.sync_branch }}
+        run: |
+          set -euo pipefail
+
+          cd platform-jwplc
+
+          git status --short
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes detected."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git add "${{ steps.cfg.outputs.platform_libraries_path }}"
+          git add "docs/jw-libraries-snapshot.md"
+
+          git commit -m "chore: sync JW libraries snapshot"
+          git push origin "HEAD:$SYNC_BRANCH" --force-with-lease
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update Pull Request
+        if: steps.commit.outputs.has_changes == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PLATFORM_PUSH_TOKEN }}
+          PLATFORM_REPO: ${{ steps.cfg.outputs.platform_repo }}
+          BASE_BRANCH: ${{ steps.cfg.outputs.base_branch }}
+          SYNC_BRANCH: ${{ steps.cfg.outputs.sync_branch }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER=$(gh pr list \
+            -R "$PLATFORM_REPO" \
+            --head "$SYNC_BRANCH" \
+            --base "$BASE_BRANCH" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          PR_TITLE="chore: sync JW libraries snapshot"
+          PR_BODY=$(cat <<EOF
+          ## Resumen
+
+          Sincroniza snapshots estables de librerías desde \`JW-Control/JW-Libraries\` hacia el package Arduino \`platform-jwplc\`.
+
+          Rama origen generada:
+
+          \`\`\`txt
+          $SYNC_BRANCH
+          \`\`\`
+
+          Rama base:
+
+          \`\`\`txt
+          $BASE_BRANCH
+          \`\`\`
+
+          ## Librerías incluidas
+
+          \`\`\`txt
+          ${{ steps.cfg.outputs.libraries }}
+          \`\`\`
+
+          ## Notas
+
+          - Este PR no debe modificar \`boards.txt\`, \`platform.txt\`, core ni variantes.
+          - Solo debe actualizar snapshots dentro de \`${{ steps.cfg.outputs.platform_libraries_path }}\`.
+          - El package JWPLC incluye estas librerías como bundled libraries para instalación limpia desde Boards Manager.
+          EOF
+          )
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Updating existing PR #$PR_NUMBER"
+            gh pr edit "$PR_NUMBER" \
+              -R "$PLATFORM_REPO" \
+              --title "$PR_TITLE" \
+              --body "$PR_BODY"
+          else
+            echo "Creating new PR"
+            gh pr create \
+              -R "$PLATFORM_REPO" \
+              --base "$BASE_BRANCH" \
+              --head "$SYNC_BRANCH" \
+              --title "$PR_TITLE" \
+              --body "$PR_BODY" \
+              --draft
+          fi
