@@ -1,44 +1,61 @@
 # JW_RTC
 
-RTC library for **DS3232M / DS3232** with a clean JW-style API.
+`JW_RTC` es la librería del ecosistema **JW Control** para manejar RTC de la familia **DS3232M / DS3232** con una API limpia para Arduino/JWPLC.
 
-## Overview
-
-`JW_RTC` is the RTC library used in the JW Control ecosystem for the **DS3232M / DS3232** family.
-
-### Current scope
-Version **1.0.1** is designed for the **JWPLC package** and uses `jwplc_i2c_bridge` internally.
-
-This version already provides:
-
-- clean `DateTime` handling without `TimeLib`
-- direct read/write of date and time
-- Unix timestamp conversion
-- RTC validity check (`OSF`)
-- temperature reading
-- aging offset read/write
-- square-wave and 32kHz output control
-- Alarm 1 / Alarm 2 configuration
-- battery-backed SRAM access
-- friendlier aliases like `JWRTCDateTime`
-
-A future version can add a second backend for `Wire` to support generic Arduino and ESP32 boards outside the JWPLC environment.
+En el package **JWPLC Basic v2.0.0**, esta librería se usa para integrar el RTC físico del PLC al runtime del sistema.
 
 ---
 
-## Installation
+## Alcance actual
 
-Copy the library into your Arduino libraries folder or include it in your JWPLC package libraries folder.
+La versión actual está pensada principalmente para el package JWPLC y usa internamente:
 
-Main header:
+```txt
+jwplc_i2c_bridge
+```
+
+Esto permite compartir el bus I2C del core JWPLC sin que el usuario tenga que inicializar manualmente `Wire`.
+
+En una versión futura se puede agregar un backend adicional basado en `Wire` para proyectos Arduino/ESP32 genéricos fuera del package JWPLC.
+
+---
+
+## Características principales
+
+`JW_RTC` permite:
+
+- leer fecha y hora;
+- escribir fecha y hora;
+- verificar si la hora es válida;
+- detectar pérdida de energía mediante `OSF`;
+- convertir a/desde timestamp Unix;
+- leer temperatura interna del RTC;
+- leer/escribir aging offset;
+- configurar salida square-wave;
+- habilitar/deshabilitar salida de 32 kHz;
+- configurar Alarm 1 y Alarm 2;
+- usar SRAM/NVRAM respaldada por batería;
+- usar aliases amigables como `JWRTCDateTime`.
+
+---
+
+## Inclusión
+
+En uso standalone:
 
 ```cpp
 #include <JW_RTC.h>
 ```
 
+En `JWPLC Basic`, normalmente se usa mediante el objeto global:
+
+```cpp
+JWPLC_RTC
+```
+
 ---
 
-## Quick start
+## Ejemplo mínimo
 
 ```cpp
 #include <JW_RTC.h>
@@ -47,49 +64,47 @@ JW_RTC rtc;
 
 void setup()
 {
-  Serial.begin(115200);
-  delay(300);
+    Serial.begin(115200);
+    delay(300);
 
-  if (!rtc.begin())
-  {
-    Serial.print("RTC begin failed: ");
-    Serial.println(JW_RTC::errorToString(rtc.lastError()));
-    return;
-  }
+    if (!rtc.begin())
+    {
+        Serial.print("RTC begin failed: ");
+        Serial.println(JW_RTC::errorToString(rtc.lastError()));
+        return;
+    }
 
-  Serial.println("RTC ready");
+    Serial.println("RTC ready");
 }
 
 void loop()
 {
-  JWRTCDateTime dt;
+    JWRTCDateTime dt;
 
-  if (rtc.read(dt))
-  {
-    Serial.print(dt.year);
-    Serial.print('/');
-    Serial.print(dt.month);
-    Serial.print('/');
-    Serial.print(dt.day);
-    Serial.print(' ');
-    Serial.print(dt.hour);
-    Serial.print(':');
-    Serial.print(dt.minute);
-    Serial.print(':');
-    Serial.println(dt.second);
-  }
+    if (rtc.read(dt))
+    {
+        Serial.print(dt.year);
+        Serial.print('/');
+        Serial.print(dt.month);
+        Serial.print('/');
+        Serial.print(dt.day);
+        Serial.print(' ');
+        Serial.print(dt.hour);
+        Serial.print(':');
+        Serial.print(dt.minute);
+        Serial.print(':');
+        Serial.println(dt.second);
+    }
 
-  delay(1000);
+    delay(1000);
 }
 ```
 
 ---
 
-## Friendly aliases
+## Aliases amigables
 
-Version 1.0.1 adds easier names so user sketches do not need as much `::`.
-
-### Available aliases
+La librería expone aliases para evitar nombres largos:
 
 ```cpp
 JWRTCDateTime
@@ -101,24 +116,22 @@ JWRTCAlarm1Mode
 JWRTCAlarm2Mode
 ```
 
-### Example
+Ejemplo:
 
 ```cpp
 JWRTCDateTime dt;
 dt.year = 2026;
-dt.month = 4;
-dt.day = 19;
-dt.hour = 23;
-dt.minute = 45;
+dt.month = 5;
+dt.day = 4;
+dt.hour = 12;
+dt.minute = 30;
 dt.second = 0;
-dt.dayOfWeek = 0; // optional, auto-calculated on write
+dt.dayOfWeek = 0; // opcional, se puede autocalcular al escribir
 ```
 
 ---
 
-## DateTime structure
-
-`JWRTCDateTime` contains:
+## Estructura de fecha/hora
 
 ```cpp
 struct DateTime
@@ -129,108 +142,95 @@ struct DateTime
     uint8_t hour;
     uint8_t minute;
     uint8_t second;
-    uint8_t dayOfWeek; // 1=Sunday ... 7=Saturday
+    uint8_t dayOfWeek; // 1=domingo ... 7=sábado
     bool valid;
 };
 ```
 
-### Notes
+Notas:
 
-- valid year range: `2000..2099`
-- if `dayOfWeek = 0` during `write()`, it is auto-calculated
-- `valid` is typically filled when the structure is read from the RTC
+- Rango de año recomendado: `2000..2099`.
+- Si `dayOfWeek = 0` al escribir, la librería puede calcularlo automáticamente.
+- `valid` normalmente se llena al leer desde el RTC.
 
 ---
 
-## Constructors and initialization
+## Inicialización
 
-### `JW_RTC rtc;`
-
-Creates an RTC object using the default DS3232M / DS3232 address:
+### Constructor básico
 
 ```cpp
 JW_RTC rtc;
 ```
 
-### `bool begin()`
+### `begin()`
 
-Starts the RTC using the JWPLC bridge defaults.
+Inicializa el RTC usando el bridge I2C del ecosistema JWPLC:
 
 ```cpp
 if (!rtc.begin())
 {
-  Serial.println(JW_RTC::errorToString(rtc.lastError()));
+    Serial.println(JW_RTC::errorToString(rtc.lastError()));
 }
 ```
 
-### `bool beginWithPins(uint8_t sdaPin, uint8_t sclPin, uint32_t frequencyHz = 400000UL)`
+### `beginWithPins()`
 
-Useful when you want to initialize the bridge with explicit pins and frequency.
+Útil si se quiere inicializar el bridge con pines explícitos:
 
 ```cpp
-if (!rtc.beginWithPins(21, 22, 400000UL))
-{
-  Serial.println("RTC beginWithPins failed");
-}
+rtc.beginWithPins(21, 22, 400000UL);
 ```
 
-### `bool setClock(uint32_t frequencyHz)`
+### `setClock()`
 
-Changes I2C clock after begin.
+Cambia la frecuencia del bus I2C después del inicio:
 
 ```cpp
-rtc.setClock(100000UL);   // 100 kHz
-rtc.setClock(400000UL);   // 400 kHz
+rtc.setClock(100000UL);
+rtc.setClock(400000UL);
 ```
 
 ---
 
-## Presence and validity
+## Presencia y validez
 
-### `bool isPresent()`
-
-Checks whether the device responds.
+### `isPresent()`
 
 ```cpp
 if (rtc.isPresent())
 {
-  Serial.println("RTC detected");
-}
-else
-{
-  Serial.println("RTC not found");
+    Serial.println("RTC detectado");
 }
 ```
 
-### `bool isTimeValid()`
-
-Checks whether the oscillator stop flag (`OSF`) indicates valid time.
+### `isTimeValid()`
 
 ```cpp
 if (rtc.isTimeValid())
 {
-  Serial.println("RTC time is valid");
+    Serial.println("Hora válida");
 }
 else
 {
-  Serial.println("RTC lost power or time is not valid");
+    Serial.println("RTC perdió energía o la hora no es válida");
 }
 ```
 
-### `bool lostPower()`
+### `lostPower()`
 
-Convenience helper equivalent to "time is not valid".
+Helper equivalente a “la hora no es válida”:
 
 ```cpp
 if (rtc.lostPower())
 {
-  Serial.println("RTC lost power");
+    Serial.println("RTC perdió energía");
 }
 ```
 
-### `bool clearOscillatorStopFlag()`
+### `clearOscillatorStopFlag()`
 
-Clears the `OSF` bit after setting or validating time.
+Limpia el flag `OSF` luego de setear o validar la hora:
 
 ```cpp
 rtc.clearOscillatorStopFlag();
@@ -238,28 +238,20 @@ rtc.clearOscillatorStopFlag();
 
 ---
 
-## Read date and time
+## Leer fecha y hora
 
-### `bool read(JWRTCDateTime& dt)`
-
-Reads current date and time into a structure.
+### `read()`
 
 ```cpp
 JWRTCDateTime dt;
 
 if (rtc.read(dt))
 {
-  Serial.print(dt.year);
-  Serial.print('/');
-  Serial.print(dt.month);
-  Serial.print('/');
-  Serial.println(dt.day);
+    Serial.println(dt.year);
 }
 ```
 
-### `JWRTCDateTime now()`
-
-Returns a `DateTime` by value.
+### `now()`
 
 ```cpp
 JWRTCDateTime dt = rtc.now();
@@ -267,281 +259,140 @@ JWRTCDateTime dt = rtc.now();
 
 ---
 
-## Write date and time
-
-### `bool write(const JWRTCDateTime& dt)`
-
-Writes date and time to the RTC.
+## Escribir fecha y hora
 
 ```cpp
 JWRTCDateTime dt;
 dt.year = 2026;
-dt.month = 4;
-dt.day = 19;
-dt.hour = 23;
-dt.minute = 59;
+dt.month = 5;
+dt.day = 4;
+dt.hour = 12;
+dt.minute = 30;
 dt.second = 0;
-dt.dayOfWeek = 0; // auto-calculate
+dt.dayOfWeek = 0;
 
 if (!rtc.write(dt))
 {
-  Serial.println(JW_RTC::errorToString(rtc.lastError()));
+    Serial.println(JW_RTC::errorToString(rtc.lastError()));
 }
 ```
 
 ---
 
-## Build-time helper
-
-### `static bool fromBuildTime(const char* buildDate, const char* buildTime, JWRTCDateTime& dt)`
-
-Parses `__DATE__` and `__TIME__`.
+## Setear desde fecha/hora de compilación
 
 ```cpp
 JWRTCDateTime dt;
 
 if (JW_RTC::fromBuildTime(__DATE__, __TIME__, dt))
 {
-  rtc.write(dt);
+    rtc.write(dt);
+    rtc.clearOscillatorStopFlag();
 }
 ```
 
-This is useful for setting the RTC at upload time.
+Esto es útil para cargar una hora inicial al momento de subir el sketch.
 
 ---
 
-## Unix timestamp conversion
+## Timestamp Unix
 
-### `bool readUnix(uint32_t& unixTime)`
-
-Reads RTC and converts to Unix timestamp.
+### Leer Unix time
 
 ```cpp
 uint32_t ts = 0;
 
 if (rtc.readUnix(ts))
 {
-  Serial.print("Unix: ");
-  Serial.println(ts);
+    Serial.println(ts);
 }
 ```
 
-### `bool writeUnix(uint32_t unixTime)`
-
-Writes RTC from Unix timestamp.
+### Escribir Unix time
 
 ```cpp
 rtc.writeUnix(1776542400UL);
 ```
 
-### `static uint32_t toUnix(const JWRTCDateTime& dt)`
-
-Converts a `DateTime` structure to Unix timestamp.
+### Convertir manualmente
 
 ```cpp
-JWRTCDateTime dt;
-dt.year = 2026;
-dt.month = 4;
-dt.day = 19;
-dt.hour = 12;
-dt.minute = 0;
-dt.second = 0;
-
 uint32_t ts = JW_RTC::toUnix(dt);
-```
-
-### `static bool fromUnix(uint32_t unixTime, JWRTCDateTime& dt)`
-
-Converts Unix timestamp to `DateTime`.
-
-```cpp
-JWRTCDateTime dt;
-JW_RTC::fromUnix(1776542400UL, dt);
+JW_RTC::fromUnix(ts, dt);
 ```
 
 ---
 
-## Temperature
+## Temperatura
 
-The DS3232M / DS3232 provides internal temperature information.
-
-### `bool readTemperatureC(float& tempC)`
-
-Returns temperature in Celsius as float.
+El DS3232M / DS3232 permite leer temperatura interna.
 
 ```cpp
 float tempC = 0.0f;
 
 if (rtc.readTemperatureC(tempC))
 {
-  Serial.print("Temp C: ");
-  Serial.println(tempC, 2);
+    Serial.print("Temp C: ");
+    Serial.println(tempC, 2);
 }
 ```
 
-### `bool readTemperatureCentiC(int16_t& tempCenti)`
-
-Returns temperature in hundredths of a degree.
+También puede leerse en centésimas de grado:
 
 ```cpp
 int16_t tempCenti = 0;
 
 if (rtc.readTemperatureCentiC(tempCenti))
 {
-  Serial.print("Temp x100: ");
-  Serial.println(tempCenti);
+    Serial.println(tempCenti); // 3725 = 37.25 °C
 }
 ```
-
-Example: `3725` means `37.25 °C`.
 
 ---
 
 ## Aging offset
 
-### `bool getAgingOffset(int8_t& offset)`
-
-Reads the aging offset register.
-
 ```cpp
 int8_t offset = 0;
+
 rtc.getAgingOffset(offset);
-Serial.println(offset);
-```
-
-### `bool setAgingOffset(int8_t offset)`
-
-Writes the aging offset register.
-
-```cpp
 rtc.setAgingOffset(-2);
 ```
 
 ---
 
-## Force temperature conversion
+## Square-wave y 32 kHz
 
-### `bool forceTemperatureConversion()`
-
-Requests a manual temperature conversion.
-
-```cpp
-if (rtc.forceTemperatureConversion())
-{
-  Serial.println("Conversion requested");
-}
-```
-
----
-
-## Square-wave output
-
-### `bool setSquareWave(JWRTCSquareWaveMode mode, bool batteryBacked = false)`
-
-Configures the SQW output.
-
-Supported modes:
-
-- `JW_RTC::SquareWaveMode::Off`
-- `JW_RTC::SquareWaveMode::Hz1`
-- `JW_RTC::SquareWaveMode::Hz1024`
-- `JW_RTC::SquareWaveMode::Hz4096`
-- `JW_RTC::SquareWaveMode::Hz8192`
-
-Example:
+### Square-wave
 
 ```cpp
 rtc.setSquareWave(JW_RTC::SquareWaveMode::Hz1);
 ```
 
-Battery-backed example:
+Modos típicos:
 
-```cpp
-rtc.setSquareWave(JW_RTC::SquareWaveMode::Hz1, true);
+```txt
+Off
+Hz1
+Hz1024
+Hz4096
+Hz8192
 ```
 
----
-
-## 32kHz output
-
-### `bool set32kHzOutput(bool enable)`
-
-Enables or disables the 32kHz output.
+### Salida 32 kHz
 
 ```cpp
 rtc.set32kHzOutput(true);
-```
 
-### `bool get32kHzOutput(bool& enable)`
-
-Reads the 32kHz output state.
-
-```cpp
-bool en = false;
-rtc.get32kHzOutput(en);
-Serial.println(en);
+bool enabled = false;
+rtc.get32kHzOutput(enabled);
 ```
 
 ---
 
-## Raw control/status registers
+## Alarmas
 
-These helpers are useful for advanced users.
-
-### `bool readControl(uint8_t& value)`
-
-```cpp
-uint8_t ctrl = 0;
-rtc.readControl(ctrl);
-```
-
-### `bool writeControl(uint8_t value)`
-
-```cpp
-rtc.writeControl(0x04);
-```
-
-### `bool updateControl(uint8_t mask, uint8_t value)`
-
-```cpp
-rtc.updateControl(0x04, 0x04);
-```
-
-### `bool readStatus(uint8_t& value)`
-
-```cpp
-uint8_t status = 0;
-rtc.readStatus(status);
-```
-
-### `bool writeStatus(uint8_t value)`
-
-```cpp
-rtc.writeStatus(0x00);
-```
-
-### `bool updateStatus(uint8_t mask, uint8_t value)`
-
-```cpp
-rtc.updateStatus(0x80, 0x00); // clear OSF
-```
-
----
-
-## Alarm 1
-
-### `bool setAlarm1(const JWRTCAlarm1Config& cfg)`
-
-Alarm 1 supports:
-
-- every second
-- seconds match
-- minutes/seconds match
-- hours/minutes/seconds match
-- date/hours/minutes/seconds match
-- day/hours/minutes/seconds match
-
-Example: daily at 08:30:00
+### Alarm 1
 
 ```cpp
 JWRTCAlarm1Config a1;
@@ -549,41 +400,13 @@ a1.mode = JW_RTC::Alarm1Mode::MatchDateHoursMinutesSeconds;
 a1.second = 0;
 a1.minute = 30;
 a1.hour = 8;
-a1.day = 1;         // ignored unless mode uses date/day
+a1.day = 1;
 a1.dayOfWeek = false;
 
 rtc.setAlarm1(a1);
 ```
 
-Example: weekly by day-of-week
-
-```cpp
-JWRTCAlarm1Config a1;
-a1.mode = JW_RTC::Alarm1Mode::MatchDayHoursMinutesSeconds;
-a1.second = 0;
-a1.minute = 0;
-a1.hour = 7;
-a1.day = 2;         // Monday if 1=Sunday
-a1.dayOfWeek = true;
-
-rtc.setAlarm1(a1);
-```
-
----
-
-## Alarm 2
-
-### `bool setAlarm2(const JWRTCAlarm2Config& cfg)`
-
-Alarm 2 supports:
-
-- every minute
-- minute match
-- hour/minute match
-- date/hour/minute match
-- day/hour/minute match
-
-Example: daily at 18:45
+### Alarm 2
 
 ```cpp
 JWRTCAlarm2Config a2;
@@ -596,270 +419,144 @@ a2.dayOfWeek = false;
 rtc.setAlarm2(a2);
 ```
 
----
-
-## Alarm interrupts and flags
-
-### `bool enableAlarmInterrupts(bool alarm1Enable, bool alarm2Enable)`
-
-```cpp
-rtc.enableAlarmInterrupts(true, false);   // only alarm 1
-```
-
-### `bool getAlarm1Flag(bool& fired)`
+### Flags de alarma
 
 ```cpp
 bool fired = false;
+
 rtc.getAlarm1Flag(fired);
-```
-
-### `bool getAlarm2Flag(bool& fired)`
-
-```cpp
-bool fired = false;
-rtc.getAlarm2Flag(fired);
-```
-
-### `bool clearAlarm1Flag()`
-
-```cpp
 rtc.clearAlarm1Flag();
-```
 
-### `bool clearAlarm2Flag()`
-
-```cpp
+rtc.getAlarm2Flag(fired);
 rtc.clearAlarm2Flag();
 ```
 
-### `bool clearAlarmFlags()`
-
-```cpp
-rtc.clearAlarmFlags();
-```
-
 ---
 
-## Battery-backed NVRAM
+## NVRAM respaldada por batería
 
-The DS3232M / DS3232 provides `236 bytes` of battery-backed SRAM.
+El DS3232M / DS3232 ofrece SRAM respaldada por batería.
 
-### `bool nvramRead(uint8_t addr, uint8_t* data, size_t len)`
-
-```cpp
-uint8_t buf[8];
-rtc.nvramRead(0, buf, sizeof(buf));
-```
-
-### `bool nvramWrite(uint8_t addr, const uint8_t* data, size_t len)`
+Ejemplo con bytes:
 
 ```cpp
-uint8_t buf[4] = {1,2,3,4};
-rtc.nvramWrite(0, buf, sizeof(buf));
+uint8_t data[4] = {1, 2, 3, 4};
+
+rtc.nvramWrite(0, data, sizeof(data));
+
+uint8_t restored[4];
+rtc.nvramRead(0, restored, sizeof(restored));
 ```
 
-### `bool nvramReadByte(uint8_t addr, uint8_t& value)`
-
-```cpp
-uint8_t value = 0;
-rtc.nvramReadByte(0, value);
-```
-
-### `bool nvramWriteByte(uint8_t addr, uint8_t value)`
-
-```cpp
-rtc.nvramWriteByte(0, 42);
-```
-
-### `template <typename T> bool nvramReadObject(uint8_t addr, T& value)`
+Ejemplo con estructura:
 
 ```cpp
 struct ConfigData
 {
-  uint16_t magic;
-  uint32_t counter;
+    uint16_t magic;
+    uint32_t counter;
 };
 
-ConfigData data;
-rtc.nvramReadObject(0, data);
-```
+ConfigData cfg = {0x55AA, 123};
 
-### `template <typename T> bool nvramWriteObject(uint8_t addr, const T& value)`
+rtc.nvramWriteObject(0, cfg);
 
-```cpp
-ConfigData data;
-data.magic = 0x55AA;
-data.counter = 123;
-rtc.nvramWriteObject(0, data);
+ConfigData restored;
+rtc.nvramReadObject(0, restored);
 ```
 
 ---
 
-## Error handling
+## Manejo de errores
 
-### `JWRTCError lastError() const`
-
-Returns the last error code.
+### `lastError()`
 
 ```cpp
 JWRTCError err = rtc.lastError();
 ```
 
-### `void clearError()`
-
-```cpp
-rtc.clearError();
-```
-
-### `static const __FlashStringHelper* errorToString(JWRTCError error)`
+### `errorToString()`
 
 ```cpp
 Serial.println(JW_RTC::errorToString(rtc.lastError()));
 ```
 
-Typical errors:
+Errores típicos:
 
-- `Ok`
-- `DeviceNotFound`
-- `BusInitFailed`
-- `ReadFailed`
-- `WriteFailed`
-- `InvalidArgument`
-- `OutOfRange`
-- `NotReady`
-
----
-
-## Utility helpers
-
-### `static bool isLeapYear(uint16_t year)`
-
-```cpp
-bool leap = JW_RTC::isLeapYear(2028);
-```
-
-### `static uint8_t daysInMonth(uint16_t year, uint8_t month)`
-
-```cpp
-uint8_t days = JW_RTC::daysInMonth(2026, 2);
-```
-
-### `static bool isValidDateTime(const JWRTCDateTime& dt)`
-
-```cpp
-if (JW_RTC::isValidDateTime(dt))
-{
-  Serial.println("DateTime is valid");
-}
+```txt
+Ok
+DeviceNotFound
+BusInitFailed
+ReadFailed
+WriteFailed
+InvalidArgument
+OutOfRange
+NotReady
 ```
 
 ---
 
-## Complete example
+## Uso típico dentro de JWPLC Basic
+
+En `JWPLC Basic`, el RTC está integrado al runtime.
+
+Uso conceptual:
 
 ```cpp
-#include <JW_RTC.h>
-
-JW_RTC rtc;
-
-void printDateTime(const JWRTCDateTime& dt)
-{
-  Serial.print(dt.year);
-  Serial.print('/');
-  if (dt.month < 10) Serial.print('0');
-  Serial.print(dt.month);
-  Serial.print('/');
-  if (dt.day < 10) Serial.print('0');
-  Serial.print(dt.day);
-  Serial.print(' ');
-
-  if (dt.hour < 10) Serial.print('0');
-  Serial.print(dt.hour);
-  Serial.print(':');
-  if (dt.minute < 10) Serial.print('0');
-  Serial.print(dt.minute);
-  Serial.print(':');
-  if (dt.second < 10) Serial.print('0');
-  Serial.println(dt.second);
-}
-
-void setup()
-{
-  Serial.begin(115200);
-  delay(300);
-
-  if (!rtc.begin())
-  {
-    Serial.print("RTC begin failed: ");
-    Serial.println(JW_RTC::errorToString(rtc.lastError()));
-    return;
-  }
-
-  Serial.println("RTC ready");
-
-  if (rtc.lostPower())
-  {
-    JWRTCDateTime buildDt;
-    if (JW_RTC::fromBuildTime(__DATE__, __TIME__, buildDt))
-    {
-      rtc.write(buildDt);
-      Serial.println("RTC set from build time");
-    }
-  }
-}
-
-void loop()
-{
-  JWRTCDateTime dt;
-  float tempC = 0.0f;
-
-  if (rtc.read(dt))
-  {
-    printDateTime(dt);
-  }
-  else
-  {
-    Serial.print("Read failed: ");
-    Serial.println(JW_RTC::errorToString(rtc.lastError()));
-  }
-
-  if (rtc.readTemperatureC(tempC))
-  {
-    Serial.print("Temp C: ");
-    Serial.println(tempC, 2);
-  }
-
-  delay(1000);
-}
+auto now = JWPLC_RTC.now();
 ```
 
----
+Aplicaciones:
 
-## Current backend note
-
-Version **1.0.1** uses:
-
-- `jwplc_i2c_bridge`
-
-That makes it ideal for the current **JWPLC Basic** package.
-
-A future release can keep the same API and add a second backend for:
-
-- `Wire`
-
-to support generic Arduino and ESP32 boards outside JWPLC.
+- fecha/hora en pantalla;
+- logs en microSD;
+- timestamp de eventos;
+- control de procesos;
+- diagnóstico;
+- registro de alarmas.
 
 ---
 
-## Changelog summary
+## Validación recomendada para alpha31
 
-### 1.0.1
-- added friendlier aliases like `JWRTCDateTime`
-- no backend changes
-- no functional changes to RTC access logic
+Para alpha31 se recomienda validar:
 
-### 1.0.0
-- initial public release
-- clean JW-style API for DS3232M / DS3232
-- bridge backend based on `jwplc_i2c_bridge`
-- temperature, alarms, NVRAM, square-wave and 32kHz support
+- RTC detectado.
+- `now()` / `read()`.
+- seteo manual de hora.
+- seteo desde `__DATE__` / `__TIME__`.
+- detección de hora inválida / `lostPower()`.
+- lectura de temperatura.
+- comportamiento dentro de `JWPLC Basic`.
+- ausencia de bloqueo si el RTC no responde.
+
+---
+
+## Nota de backend actual
+
+La versión actual usa:
+
+```txt
+jwplc_i2c_bridge
+```
+
+Esto la hace ideal para el package **JWPLC Basic** actual.
+
+Futuro posible:
+
+```txt
+backend Wire
+```
+
+para soportar placas Arduino/ESP32 genéricas fuera del entorno JWPLC.
+
+---
+
+## Estado
+
+Documentación propuesta en español para revisión de:
+
+```txt
+JWPLC Basic v2.0.0-alpha.31
+JW_RTC
+```

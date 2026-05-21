@@ -25,3 +25,9 @@ BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
 IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
 OF SUCH DAMAGE.
+
+## Nota de licencia
+
+La base original de Adafruit FRAM SPI usa licencia BSD. Si esta librería deriva de ese trabajo, se debe conservar la atribución correspondiente y mantener el texto de licencia aplicable dentro del repositorio.
+
+Esta librería mantiene una API adaptada al ecosistema JW Control/JWPLC, pero cualquier archivo derivado debe respetar las condiciones de licencia de la base original.

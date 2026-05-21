@@ -53,6 +53,22 @@ Con eso, se pueden construir:
 
 ---
 
+## Integración con JWPLC Basic
+
+Dentro del package `JWPLC Basic`, esta librería puede ser usada como base para la botonera frontal del PLC mediante objetos globales del ecosistema JWPLC.
+
+En uso normal del PLC, el usuario final no necesita escanear manualmente la matriz si trabaja con las APIs ya integradas del package. Sin embargo, `JW_MatrixButtons` sigue siendo útil para proyectos standalone, HMIs personalizadas o botoneras matriciales externas.
+
+La recomendación para interfaces con varias pantallas se mantiene:
+
+```cpp
+clearPendingInput();
+```
+
+al cambiar de pantalla, entrar a edición, cerrar popups o volver a una vista anterior.
+
+---
+
 ## Instalación (manual)
 
 1. Crear una carpeta en `Documents/Arduino/libraries/` llamada:
