@@ -261,10 +261,36 @@ fram.disableDebug();
 
 Eso evita amarrar la librería exclusivamente a `Serial`.
 
-## Estado de la versión bundled
+## Dispositivos no soportados en la tabla interna
 
-```text
-JW_FRAM 1.0.3
+Si la librería no reconoce el `Device ID`, puedes forzar manualmente el tamaño al iniciar:
+
+```cpp
+fram.begin(8 * 1024);
 ```
 
-Corrección principal: escritura validada de bloques compatible con la FM25CL64B usada por JWPLC Basic.
+Eso permite trabajar con memorias FRAM compatibles aunque no estén todavía incluidas en la tabla interna.
+
+## Estructura recomendada de la librería
+
+La librería ya fue preparada con archivos compatibles con el ecosistema Arduino:
+- `src/`
+- `examples/`
+- `library.properties`
+- `README.md`
+- `CHANGELOG.md`
+- `keywords.txt`
+- `LICENCE`
+
+## Ideas futuras
+
+Para versiones posteriores podrían añadirse:
+
+- CRC16 en lugar de checksum simple
+- funciones `fill()` o `clear()`
+- más modelos en la tabla de dispositivos
+- más ejemplos de uso orientados a productos JWPLC
+
+## Nota de licencia
+
+La base original de Adafruit usa licencia BSD. Si esta librería deriva de ese trabajo, se debe conservar la atribución correspondiente y mantener el texto de licencia apropiado. El repositorio de Adafruit FRAM SPI publica su licencia BSD con cláusula de atribución y limitación de responsabilidad.
