@@ -225,6 +225,8 @@ Esto sirve para detectar:
 - corrupción de datos
 - tamaños de payload incorrectos
 
+Desde `JW_FRAM 1.0.3`, `writeBlock()` ejecuta una habilitación de escritura independiente para el header y otra para el payload. Esto mantiene compatibilidad con memorias que limpian el latch WEL al finalizar cada comando `WRITE`.
+
 ### Ejemplo
 
 ```cpp
@@ -272,7 +274,6 @@ Eso permite trabajar con memorias FRAM compatibles aunque no estén todavía inc
 ## Estructura recomendada de la librería
 
 La librería ya fue preparada con archivos compatibles con el ecosistema Arduino:
-
 - `src/`
 - `examples/`
 - `library.properties`
@@ -292,4 +293,4 @@ Para versiones posteriores podrían añadirse:
 
 ## Nota de licencia
 
-La base original de Adafruit usa licencia BSD. Si esta librería deriva de ese trabajo, se debe conservar la atribución correspondiente y mantener el texto de licencia apropiado. El repositorio de Adafruit FRAM SPI publica su licencia BSD con cláusula de atribución y limitación de responsabilidad. citeturn948721view0
+La base original de Adafruit usa licencia BSD. Si esta librería deriva de ese trabajo, se debe conservar la atribución correspondiente y mantener el texto de licencia apropiado. El repositorio de Adafruit FRAM SPI publica su licencia BSD con cláusula de atribución y limitación de responsabilidad.
