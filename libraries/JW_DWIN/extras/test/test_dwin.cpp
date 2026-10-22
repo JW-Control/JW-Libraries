@@ -162,6 +162,42 @@ int main()
     dwin.enableTouch(start, 0);
     CHECK(t.ops.size() == 2);
 
+    // isConfirmed: un valor enviado y confirmado queda confirmado; un envío
+    // fallido no.
+    DWIN_Value edit = {0x10, 0x30, 9, 0, 0};
+    dwin.sendValue(edit, 40);
+    CHECK(dwin.isConfirmed(edit));
+    t.online = false;
+    dwin.sendValue(edit, 41);
+    CHECK(!dwin.isConfirmed(edit) && edit.val == 41);
+    t.online = true;
+    dwin.sendValue(edit, 41);
+    CHECK(dwin.isConfirmed(edit));
+
+    // Pantalla reiniciada: la lectura que restablece el enlace no cuenta
+    // como edición aunque el VP traiga otro valor (el inicial de la DWIN).
+    t.online = false;
+    for (int i = 0; i < 3; i++) dwin.readValue(edit);
+    CHECK(!dwin.isOnline());
+    t.vp[0x1030] = 0;  // valor inicial tras el reinicio
+    t.online = true;
+    g_mockMs += 500;
+    CHECK(!dwin.readValue(edit));
+    CHECK(dwin.isOnline() && dwin.reconnected());
+    CHECK(edit.val == 41 && !dwin.isConfirmed(edit));
+    dwin.sendValue(edit, 41);  // la aplicación reenvía el valor vigente
+    CHECK(dwin.isConfirmed(edit) && t.vp[0x1030] == 41);
+    t.vp[0x1030] = 45;         // edición real del operador
+    CHECK(dwin.readValue(edit) && edit.val == 45 && dwin.isConfirmed(edit));
+
+    // Tras una reconexión cualquier objeto confirmado antes deja de estarlo.
+    t.online = false;
+    for (int i = 0; i < 3; i++) dwin.sendValue(prog, 500 + i);
+    t.online = true;
+    g_mockMs += 500;
+    dwin.sendValue(prog, 600);
+    CHECK(dwin.reconnected() && !dwin.isConfirmed(edit));
+
     // Sin debug configurado no se imprime nada.
     CHECK(Serial.out.empty());
 

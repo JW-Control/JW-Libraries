@@ -58,7 +58,8 @@ void loop()
 | `setPage(page)` | Cambia de página (`0x5A01` en `0x0084`). |
 | `enableTouch(obj, state, force)` | Habilita o bloquea un control táctil (`0x5AA5` en `0x00B0`). |
 | `sendValue(obj, value, force, debug)` | Escribe un VP numérico si cambió o no estaba confirmado. |
-| `readValue(obj, debug)` | Lee un VP; devuelve `true` si cambió. |
+| `readValue(obj, debug)` | Lee un VP; devuelve `true` si cambió. La lectura que restablece el enlace nunca cuenta como cambio. |
+| `isConfirmed(obj)` | `true` si la pantalla confirmó el valor o texto del objeto desde la última reconexión. |
 | `sendText(obj, text, force)` | Escribe un texto de largo fijo (relleno con espacios). |
 | `checkKey(key)` | Si la tecla fue pulsada, `key.Enable = 1` y limpia el VP. |
 | `keyEncoder(minus, plus, count, min, max)` | Dos teclas como encoder, con vuelta circular. |
@@ -76,6 +77,8 @@ Las operaciones devuelven `false` si la pantalla no confirmó. `lastErrorString(
 - **Cache confirmada:** un valor, texto o estado táctil solo se da por enviado cuando la pantalla responde. Si falla, la siguiente llamada lo reintenta.
 - **Sin enlace:** tras `JW_DWIN_OFFLINE_FAILURES` fallos seguidos (3), solo se intenta una operación cada `JW_DWIN_OFFLINE_RETRY_MS` (500 ms). El loop de la aplicación sigue corriendo sin esperar timeouts repetidos.
 - **Reconexión:** al volver a comunicar se invalida la cache y `reconnected()` devuelve `true` una vez. Usarlo para volver a la página actual.
+- **Valores editables por el operador:** leerlos como edición solo si `isConfirmed(obj)`; si no, reenviar primero el valor vigente. Así un envío fallido o el valor inicial de una pantalla reiniciada nunca se toman como una edición.
+- **Estados enviados una sola vez** (íconos, habilitación táctil): tras una reconexión no se reenvían solos. Conviene enviarlos en cada ciclo del `loop` según el estado de la aplicación; la cache evita el tráfico repetido.
 - Las operaciones son bloqueantes con timeout (`JW_DWIN_ModbusRTU::setTimeout`, 150 ms por defecto).
 
 ## Limitaciones

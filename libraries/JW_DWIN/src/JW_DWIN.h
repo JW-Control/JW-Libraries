@@ -137,7 +137,19 @@ public:
                    bool forceSend = false, bool debug = false);
 
     // Lee un valor desde el HMI. Devuelve true si hubo cambio.
+    // La lectura que restablece el enlace nunca cuenta como cambio: la
+    // pantalla pudo reiniciarse y mostrar su valor inicial. En ese caso el
+    // objeto queda sin confirmar (ver isConfirmed) y conserva su valor.
     bool readValue(DWIN_Value &obj, bool debug = false);
+
+    // true si la pantalla confirmó el valor/texto del objeto desde la última
+    // reconexión. Un valor editable por el operador solo debe leerse como
+    // edición cuando está confirmado; si no, se reenvía primero.
+    template <typename T>
+    bool isConfirmed(const T &obj) const
+    {
+        return obj.epoch == _epoch;
+    }
 
     // Envía texto a un campo string fijo. Devuelve true si quedó confirmado.
     bool sendText(DWIN_String &obj, const String &newText,

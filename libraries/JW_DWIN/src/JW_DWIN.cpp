@@ -69,8 +69,17 @@ void JW_DWIN::sendValue(DWIN_Value &obj, uint16_t newValue, bool forceSend, bool
 bool JW_DWIN::readValue(DWIN_Value &obj, bool debug)
 {
     uint16_t newVal = 0;
+    const uint16_t epochBefore = _epoch;
     if (!readRegister(vp(obj.page, obj.addr), newVal, "readValue"))
     {
+        return false;
+    }
+
+    if (_epoch != epochBefore)
+    {
+        // Esta lectura restableció el enlace: el valor leído puede ser el
+        // inicial de una pantalla reiniciada, no una edición del operador.
+        obj.epoch = 0;
         return false;
     }
 

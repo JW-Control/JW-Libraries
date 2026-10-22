@@ -7,6 +7,7 @@
 - Interfaz `JW_DWIN_Transport`; transporte `JW_DWIN_ModbusRTU` (RS-485, DGUS Modbus) sobre `JW_ModbusRTU`.
 - Cache confirmada por la pantalla: un envío fallido se reintenta en la siguiente llamada.
 - Modo sin enlace (`setOfflinePolicy`), aviso de reconexión (`reconnected()`) e invalidación de cache.
+- `isConfirmed(obj)`; `readValue()` no reporta cambio en la lectura que restablece el enlace.
 - Prueba N1 en host (`extras/test`).
 
 ### Cambiado respecto a JW_DWIN_RS485 1.x
