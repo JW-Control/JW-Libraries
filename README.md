@@ -28,11 +28,17 @@ Librerías previstas:
 - `JW_MatrixButtons`
 - `JW_DWIN_RS485`
 - `JW_FRAM`
+- `JW_RS485`
+- `JW_ModbusRTU`
+- `JW_DWIN`
 
 Subrepos públicos esperados:
 - `JW-Control/JW_MatrixButtons`
 - `JW-Control/JW_DWIN_RS485`
 - `JW-Control/JW_FRAM`
+- `JW-Control/JW_RS485`
+- `JW-Control/JW_ModbusRTU`
+- `JW-Control/JW_DWIN`
 
 ---
 
