@@ -488,6 +488,8 @@ void JW_ModbusRTU::pollServer()
                 break;
             }
 
+            // Contar cada byte consumido, incluso el que desborda el buffer.
+            _stats.rxBytes++;
             if (_rxLength >= JW_MODBUS_RTU_MAX_FRAME)
             {
                 clearRxBuffer();
@@ -495,8 +497,6 @@ void JW_ModbusRTU::pollServer()
                 return;
             }
 
-            _stats.rxBytes++;
-            _stats.rxBytes++;
             _rxBuffer[_rxLength++] = (uint8_t)value;
             _lastByteUs = micros();
         }
@@ -900,6 +900,8 @@ void JW_ModbusRTU::pollMaster()
                 break;
             }
 
+            // Contar cada byte consumido, incluso el que desborda el buffer.
+            _stats.rxBytes++;
             if (_rxLength >= JW_MODBUS_RTU_MAX_FRAME)
             {
                 clearRxBuffer();

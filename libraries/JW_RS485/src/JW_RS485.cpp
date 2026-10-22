@@ -136,6 +136,15 @@ bool JW_RS485::begin(uint32_t baud, uint32_t config)
     }
 
     _serial->begin(_baud, _config, _rxPin, _txPin);
+    // HardwareSerial::begin() retorna void. Su operator bool() comprueba
+    // uartIsDriverInstalled(); no declarar listo un UART que no inició.
+    if (!static_cast<bool>(*_serial))
+    {
+        _ready = false;
+        setError(JW_RS485_UNKNOWN_ERROR);
+        return false;
+    }
+
     _ready = true;
     clearError();
     _lastActivityMs = 0;

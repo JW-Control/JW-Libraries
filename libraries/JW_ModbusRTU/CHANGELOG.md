@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] - 2026-10-22
+
+### Corregido
+- `rxBytes` contaba dos veces cada byte en el esclavo y no contaba en el maestro (lectura byte a byte). Ahora cuenta cada byte consumido, incluido el que desborda el buffer. Igual que `JWPLC_ModbusRTU` en `release/v2.1.x`.
+- La prueba de equivalencia compara también `rxBytes` y usa como referencia `release/v2.1.x`.
+
 ## [0.1.0] - 2026-10-22
 
 ### Añadido

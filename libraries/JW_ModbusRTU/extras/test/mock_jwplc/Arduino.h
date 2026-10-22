@@ -84,6 +84,8 @@ public:
         baud = (uint32_t)b; cfg = c; rxPin = r; txPin = t; begun = true;
     }
     void end() { begun = false; }
+    // Como en ESP32: true si el driver UART quedó instalado.
+    explicit operator bool() const { return begun; }
     size_t setTxBufferSize(size_t n) { txBufferSize = n; return n; }
     uint32_t baudRate() { return baud; }
 

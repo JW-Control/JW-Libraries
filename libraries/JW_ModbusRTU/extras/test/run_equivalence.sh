@@ -4,8 +4,8 @@
 #
 # Uso: bash run_equivalence.sh <carpeta libraries con el JWPLC_ModbusRTU original>
 # El original es el de platform-jwplc antes de convertirlo en envoltorio
-# (main aa0bfed, JWPLC/2.1.0/libraries). Ejemplo para extraerlo:
-#   git -C platform-jwplc show aa0bfed:JWPLC/2.1.0/libraries/JWPLC_ModbusRTU/src/JWPLC_ModbusRTU.cpp
+# (release/v2.1.x, JWPLC/2.1.0/libraries). Ejemplo para extraerlo:
+#   git -C platform-jwplc show origin/release/v2.1.x:JWPLC/2.1.0/libraries/JWPLC_ModbusRTU/src/JWPLC_ModbusRTU.cpp
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LIB="$(cd "$HERE/../.." && pwd)"

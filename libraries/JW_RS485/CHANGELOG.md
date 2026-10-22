@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.1] - 2026-10-22
+
+### Corregido
+- `begin()` devuelve `false` (`JW_RS485_UNKNOWN_ERROR`) si el driver UART no quedó instalado, en lugar de declarar el puerto listo. Igual que `JWPLC_RS485` en `release/v2.1.x`.
+
 ## [0.1.0] - 2026-10-22
 
 ### Añadido

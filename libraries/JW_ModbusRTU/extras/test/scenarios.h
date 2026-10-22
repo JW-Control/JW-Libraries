@@ -169,8 +169,9 @@ static void runScenarios()
     ok = MB.readHoldingRegisters(1, 12, 1, regs, 300);  // API unificada en SYNC
     report("FC03 unified sync", ok, (int)MB.lastError(), {regs[0]});
 
-    printf("stats tx=%lu rx=%lu ok=%lu crc=%lu to=%lu\n",
+    printf("stats tx=%lu rx=%lu rxB=%lu ok=%lu crc=%lu to=%lu\n",
            (unsigned long)MB.stats().txFrames, (unsigned long)MB.stats().rxFrames,
+           (unsigned long)MB.stats().rxBytes,
            (unsigned long)MB.stats().requestsOk, (unsigned long)MB.stats().crcErrors,
            (unsigned long)MB.stats().masterTimeouts);
 
@@ -207,8 +208,9 @@ static void runScenarios()
     runSlaveFrame("S illegal function", frame({2, 0x2B, 0, 0}));
     auto bad = frame({2, 3, 0, 0, 0, 1}); bad.back() ^= 1;
     runSlaveFrame("S bad CRC", bad);
-    printf("slave stats rx=%lu tx=%lu ok=%lu crc=%lu ex=%lu valid=%d coilw=%d\n",
-           (unsigned long)MB.stats().rxFrames, (unsigned long)MB.stats().txFrames,
+    printf("slave stats rx=%lu rxB=%lu tx=%lu ok=%lu crc=%lu ex=%lu valid=%d coilw=%d\n",
+           (unsigned long)MB.stats().rxFrames, (unsigned long)MB.stats().rxBytes,
+           (unsigned long)MB.stats().txFrames,
            (unsigned long)MB.stats().requestsOk, (unsigned long)MB.stats().crcErrors,
            (unsigned long)MB.stats().exceptionsSent, MB.hasValidRequest(), MB.hasCoilWrite());
 }
