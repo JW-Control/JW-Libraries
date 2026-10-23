@@ -5,10 +5,8 @@ on:
     branches: ["main"]
     paths:
       - "platform-jwplc-sync.properties"
-      - "libraries/JW_MatrixButtons/library.properties"
-      - "libraries/JW_FRAM/library.properties"
-      - "libraries/JW_RTC/library.properties"
-      - "libraries/JW_SD/library.properties"
+      - "libraries/JW_RS485/library.properties"
+      - "libraries/JW_ModbusRTU/library.properties"
       - ".github/workflows/sync-platform-jwplc-libraries.yml"
 
   workflow_dispatch:
