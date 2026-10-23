@@ -225,6 +225,8 @@ Esto sirve para detectar:
 - corrupción de datos
 - tamaños de payload incorrectos
 
+Desde `JW_FRAM 1.0.3`, `writeBlock()` ejecuta una habilitación de escritura independiente para el header y otra para el payload. Esto mantiene compatibilidad con memorias que limpian el latch WEL al finalizar cada comando `WRITE`.
+
 ### Ejemplo
 
 ```cpp
@@ -258,6 +260,13 @@ fram.disableDebug();
 ```
 
 Eso evita amarrar la librería exclusivamente a `Serial`.
+
+## Lectura de cadenas (1.0.3)
+
+`readString()` distingue una cadena vacía válida de un fallo de lectura SPI,
+comprueba la reserva de memoria para textos no vacíos y acepta una cadena
+vacía en la última dirección disponible de la FRAM. Las firmas y el formato
+almacenado no cambian: no hace falta convertir ni borrar datos existentes.
 
 ## Dispositivos no soportados en la tabla interna
 

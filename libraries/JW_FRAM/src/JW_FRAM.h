@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <string.h>
+#include <stdlib.h>
 #include <type_traits>
 
 /** Códigos de operación SPI FRAM */
@@ -117,8 +118,6 @@ private:
                         uint8_t *readBuffer, size_t readLen);
 
   void debugPrint(const __FlashStringHelper *msg);
-  void debugPrint(const String &msg);
-  void debugPrint(const char *msg);
   void debugPrintValue(const __FlashStringHelper *prefix, uint32_t value, int base = DEC);
   uint16_t computeChecksum(const uint8_t *data, size_t len) const;
 };
@@ -213,21 +212,14 @@ bool JW_FRAM::writeBlock(uint32_t addr, const T &value, uint8_t version)
   header.length = static_cast<uint16_t>(sizeof(T));
   header.checksum = computeChecksum(reinterpret_cast<const uint8_t *>(&value), sizeof(T));
 
-  if (!writeEnable(true))
-  {
-    debugPrint(F("JW_FRAM::writeBlock() fallo al habilitar escritura"));
-    return false;
-  }
-
-  bool ok = write(addr, reinterpret_cast<const uint8_t *>(&header), sizeof(header));
+  // Header y payload se envían como dos comandos WRITE independientes.
+  // Cada WRITE usa put() para ejecutar su propio ciclo WREN -> WRITE -> WRDI.
+  // Esto evita perder el payload en dispositivos que limpian WEL al terminar
+  // la primera transacción de escritura.
+  bool ok = put(addr, header);
   if (ok)
   {
-    ok = write(addr + sizeof(header), reinterpret_cast<const uint8_t *>(&value), sizeof(T));
-  }
-
-  if (!writeEnable(false))
-  {
-    debugPrint(F("JW_FRAM::writeBlock() fallo al deshabilitar escritura"));
+    ok = put(addr + sizeof(header), value);
   }
 
   if (!ok)
@@ -278,21 +270,34 @@ bool JW_FRAM::readBlock(uint32_t addr, T &value, uint8_t expectedVersion)
     return false;
   }
 
-  if (!read(addr + sizeof(header), reinterpret_cast<uint8_t *>(&value), sizeof(T)))
+  // No publicar datos en el objeto del usuario hasta validar el checksum.
+  // El buffer dinamico evita reservar sizeof(T) sobre el stack limitado del ESP32.
+  // Conserva la API para todos los tipos trivially copyable, incluso si T
+  // no tiene constructor por defecto.
+  uint8_t *payload = static_cast<uint8_t *>(malloc(sizeof(T)));
+  if (payload == nullptr)
   {
+    debugPrint(F("JW_FRAM::readBlock() memoria insuficiente"));
+    return false;
+  }
+
+  if (!read(addr + sizeof(header), payload, sizeof(T)))
+  {
+    free(payload);
     debugPrint(F("JW_FRAM::readBlock() fallo al leer payload"));
     return false;
   }
 
-  const uint16_t checksum =
-      computeChecksum(reinterpret_cast<const uint8_t *>(&value), sizeof(T));
-
+  const uint16_t checksum = computeChecksum(payload, sizeof(T));
   if (checksum != header.checksum)
   {
+    free(payload);
     debugPrint(F("JW_FRAM::readBlock() checksum invalido"));
     return false;
   }
 
+  memcpy(&value, payload, sizeof(T));
+  free(payload);
   return true;
 }
 
