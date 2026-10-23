@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] - 2026-10-23
+
+### Documentación
+- `keywords.txt` completo: métodos `isConfirmed`, `currentPage`, `failureCount`, `lastSuccessMs`, `setTouchDelay`, `lastErrorString`, `setDebugMask`, `debugMask`, `readRegisters`, `writeRegisters`, `timeout`, `slaveId` y macros de configuración.
+- README: API completa de `JW_DWIN` y `JW_DWIN_ModbusRTU`, opciones de compilación y cómo escribir un transporte propio.
+
 ## [0.1.0] - 2026-10-22
 
 ### Añadido
