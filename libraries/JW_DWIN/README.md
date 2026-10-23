@@ -63,10 +63,42 @@ void loop()
 | `sendText(obj, text, force)` | Escribe un texto de largo fijo (relleno con espacios). |
 | `checkKey(key)` | Si la tecla fue pulsada, `key.Enable = 1` y limpia el VP. |
 | `keyEncoder(minus, plus, count, min, max)` | Dos teclas como encoder, con vuelta circular. |
-| `isOnline()`, `reconnected()`, `failureCount()` | Estado del enlace. |
+| `readRegister(vp, value)`, `writeRegister(vp, value)` | Acceso directo a un VP, sin cache. |
+| `isOnline()` | `true` mientras no se alcancen los fallos seguidos de la política sin enlace. |
+| `reconnected()` | `true` una sola vez tras volver a comunicar. |
+| `failureCount()` | Fallos acumulados desde el arranque. |
+| `lastSuccessMs()` | `millis()` de la última operación confirmada. |
+| `currentPage()` | Última página pedida con `setPage()`. |
 | `setOfflinePolicy(fallos, ms)` | Fallos seguidos para pasar a sin enlace e intervalo de reintento. |
+| `setTouchDelay(ms)` | Espera tras cambiar un estado táctil (25 ms por defecto). |
 | `invalidateCache()` | Fuerza el reenvío de todo. |
-| `setDebug(Stream&, mask)`, `withDebug(...)` | Debug opcional, apagado por defecto. |
+| `lastErrorString()` | Causa del último error del transporte. |
+| `setDebug(Stream&, mask)`, `setDebug(bool)` | Debug opcional, apagado por defecto. `setDebug(true)` usa `Serial` con `DWIN_DBG_ALL`. |
+| `setDebugMask(mask)`, `debugMask()` | Cambia o consulta la máscara de debug. |
+| `withDebug(out, mask, fn)` | Ejecuta `fn` con una salida y máscara de debug temporales. |
+
+### `JW_DWIN_ModbusRTU`
+
+| Método | Descripción |
+|---|---|
+| `JW_DWIN_ModbusRTU(modbus, slaveId, baud, config)` | Esclavo 1, 115200 y `SERIAL_8N1` por defecto. |
+| `setTimeout(ms)`, `timeout()` | Timeout por operación (150 ms por defecto). |
+| `slaveId()` | ID Modbus de la pantalla. |
+
+### Opciones de compilación
+
+Se usan dentro de `JW_DWIN.cpp`, así que deben llegar como flags de compilación (`build_opt.h` en el core ESP32, `build_flags` en PlatformIO). Un `#define` en el sketch no alcanza a la librería.
+
+| Macro | Defecto | Uso |
+|---|---|---|
+| `JW_DWIN_OFFLINE_FAILURES` | 3 | Fallos seguidos para pasar a sin enlace. En ejecución: `setOfflinePolicy()`. |
+| `JW_DWIN_OFFLINE_RETRY_MS` | 500 | Intervalo de reintento sin enlace (ms). En ejecución: `setOfflinePolicy()`. |
+| `JW_DWIN_MAX_TEXT` | 128 | Mayor texto admitido por `sendText()`. |
+| `JW_DWIN_MODBUS_DEFAULT_TIMEOUT_MS` | 150 | Timeout inicial de `JW_DWIN_ModbusRTU`. En ejecución: `setTimeout()`. |
+
+### Transporte propio
+
+Para otro medio físico, heredar de `JW_DWIN_Transport` e implementar `begin()`, `readRegisters()`, `writeRegister()`, `writeRegisters()` y `lastErrorString()`. Cada operación debe ser bloqueante con timeout y devolver `true` solo si la pantalla confirmó.
 
 ## Errores posibles
 
