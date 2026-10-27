@@ -19,7 +19,7 @@ public:
     bool begin() override { return beginOk; }
     bool readRegisters(uint16_t a, uint16_t n, uint16_t *d) override
     {
-        ops.push_back({'R', a, {}});
+        ops.push_back({'R', a, {n}});
         if (!online) return false;
         for (uint16_t i = 0; i < n; i++) d[i] = vp[a + i];
         return true;
@@ -111,6 +111,103 @@ int main()
     t.vp[0x1031] = 1;
     dwin.checkKey(start);
     CHECK(start.Enable && t.vp[0x1031] == 0);
+    start.Enable = 0;
+
+    // checkKeys: una lectura por tramo y escritura de 0 solo en las pulsadas.
+    {
+        DWIN_Key jump = {0x10, 0x23, 1, 5};
+        DWIN_Key stop = {0x10, 0x32, 5, 5};
+        DWIN_Key far = {0x10, 0x60, 6, 5};    // hueco > JW_DWIN_READ_MAX_GAP: otro tramo
+        DWIN_Key other = {0x12, 0x20, 5, 5};  // otra página
+        DWIN_Key *const keys[] = {&stop, &far, nullptr, &start, &other, &jump};
+        t.vp[0x1031] = 0;
+        t.vp[0x1032] = 1;
+        t.vp[0x1060] = 0;
+        t.vp[0x1220] = 3;
+        t.ops.clear();
+        CHECK(dwin.checkKeys(keys, 6));
+        CHECK(stop.Enable && other.Enable && !start.Enable && !jump.Enable && !far.Enable);
+        CHECK(t.vp[0x1032] == 0 && t.vp[0x1220] == 0);
+        // Tramos en orden de VP, cada uno con su limpieza.
+        CHECK(t.ops.size() == 5);
+        CHECK(t.ops[0].type == 'R' && t.ops[0].vp == 0x1023 && t.ops[0].data[0] == 16);
+        CHECK(t.ops[1].type == 'W' && t.ops[1].vp == 0x1032 && t.ops[1].data[0] == 0);
+        CHECK(t.ops[2].type == 'R' && t.ops[2].vp == 0x1060 && t.ops[2].data[0] == 1);
+        CHECK(t.ops[3].type == 'R' && t.ops[3].vp == 0x1220 && t.ops[3].data[0] == 1);
+        CHECK(t.ops[4].type == 'W' && t.ops[4].vp == 0x1220);
+
+        // Sin pulsaciones: solo lecturas, y Enable sigue hasta que se consume.
+        t.ops.clear();
+        CHECK(dwin.checkKeys(keys, 6));
+        CHECK(t.ops.size() == 3 && stop.Enable);
+        stop.Enable = other.Enable = 0;
+
+        // Dos teclas en el mismo VP: ambas se activan, una sola limpieza.
+        DWIN_Key twin = {0x10, 0x32, 9, 5};
+        DWIN_Key *const pair[] = {&stop, &twin};
+        t.vp[0x1032] = 1;
+        t.ops.clear();
+        CHECK(dwin.checkKeys(pair, 2));
+        CHECK(stop.Enable && twin.Enable && t.ops.size() == 2);
+        stop.Enable = 0;
+
+        // Lectura fallida: false y la tecla no cambia; se lee en la próxima.
+        DWIN_Key *const one[] = {&jump};
+        t.online = false;
+        t.vp[0x1023] = 1;
+        CHECK(!dwin.checkKeys(one, 1));
+        CHECK(!jump.Enable);
+        t.online = true;
+        CHECK(dwin.checkKeys(one, 1) && jump.Enable && t.vp[0x1023] == 0);
+
+        // Más de JW_DWIN_MAX_READ registros: el tramo se parte.
+        DWIN_Key row[12];
+        DWIN_Key *rowPtr[12];
+        for (int i = 0; i < 12; i++)
+        {
+            row[i] = {0x30, (uint8_t)(i * 15), 0, 5};
+            rowPtr[i] = &row[i];
+        }
+        t.vp[0x30A5] = 1;  // i = 11
+        t.ops.clear();
+        CHECK(dwin.checkKeys(rowPtr, 12));
+        CHECK(row[11].Enable && !row[0].Enable);
+        CHECK(t.ops.size() == 3);
+        CHECK(t.ops[0].vp == 0x3000 && t.ops[0].data[0] == 121);
+        CHECK(t.ops[1].vp == 0x3087 && t.ops[1].data[0] == 31);
+    }
+
+    // readValues: una lectura por tramo; cada objeto como con readValue.
+    {
+        DWIN_Value row[3] = {{0x2A, 0x05, 0, 0, 0}, {0x2A, 0x06, 1, 0, 0}, {0x2A, 0x09, 4, 0, 1}};
+        DWIN_Value farv = {0x2A, 0x40, 0, 0, 0};  // hueco > JW_DWIN_READ_MAX_GAP
+        DWIN_Value *const vals[] = {&row[2], nullptr, &farv, &row[0], &row[1]};
+        bool changed[5];
+        for (int i = 0; i < 3; i++) dwin.sendValue(row[i], 10);
+        dwin.sendValue(farv, 10);
+        t.vp[0x2A06] = 12;
+        t.vp[0x2A09] = 125;
+        t.ops.clear();
+        CHECK(dwin.readValues(vals, 5, changed));
+        CHECK(t.ops.size() == 2);
+        CHECK(t.ops[0].type == 'R' && t.ops[0].vp == 0x2A05 && t.ops[0].data[0] == 5);
+        CHECK(t.ops[1].type == 'R' && t.ops[1].vp == 0x2A40 && t.ops[1].data[0] == 1);
+        CHECK(changed[0] && !changed[1] && !changed[2] && !changed[3] && changed[4]);
+        CHECK(row[1].val == 12 && row[2].val == 125 && row[2].fval > 12.4f && row[2].fval < 12.6f);
+        CHECK(dwin.isConfirmed(row[0]) && dwin.isConfirmed(farv));
+
+        // Sin cambios; changed es opcional.
+        CHECK(dwin.readValues(vals, 5, changed) && !changed[0] && !changed[4]);
+        CHECK(dwin.readValues(vals, 5));
+
+        // Lectura fallida: false y los objetos no cambian.
+        DWIN_Value *const one[] = {&row[0]};
+        t.online = false;
+        t.vp[0x2A05] = 77;
+        CHECK(!dwin.readValues(one, 1, changed) && !changed[0] && row[0].val == 10);
+        t.online = true;
+        CHECK(dwin.readValues(one, 1, changed) && changed[0] && row[0].val == 77);
+    }
 
     // keyEncoder con vuelta circular.
     DWIN_Key up = {0x12, 0x20, 5, 5};
@@ -189,6 +286,23 @@ int main()
     CHECK(dwin.isConfirmed(edit) && t.vp[0x1030] == 41);
     t.vp[0x1030] = 45;         // edición real del operador
     CHECK(dwin.readValue(edit) && edit.val == 45 && dwin.isConfirmed(edit));
+
+    // readValues igual: la lectura que restablece el enlace no cuenta.
+    {
+        DWIN_Value *const vals[] = {&edit};
+        bool changed[1];
+        t.online = false;
+        for (int i = 0; i < 3; i++) dwin.readValues(vals, 1);
+        CHECK(!dwin.isOnline());
+        t.vp[0x1030] = 0;
+        t.online = true;
+        g_mockMs += 500;
+        CHECK(dwin.readValues(vals, 1, changed) && !changed[0]);
+        CHECK(dwin.reconnected() && edit.val == 45 && !dwin.isConfirmed(edit));
+        dwin.sendValue(edit, 45);
+        t.vp[0x1030] = 46;
+        CHECK(dwin.readValues(vals, 1, changed) && changed[0] && edit.val == 46);
+    }
 
     // Tras una reconexión cualquier objeto confirmado antes deja de estarlo.
     t.online = false;

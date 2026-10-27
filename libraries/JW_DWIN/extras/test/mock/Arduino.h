@@ -33,6 +33,17 @@ class Stream
 {
 public:
     std::string out;
+    virtual ~Stream() {}
+    virtual int available() { return 0; }
+    virtual int read() { return -1; }
+    virtual int peek() { return -1; }
+    virtual size_t write(uint8_t c) { out += (char)c; return 1; }
+    virtual size_t write(const uint8_t *b, size_t n)
+    {
+        for (size_t i = 0; i < n; i++) write(b[i]);
+        return n;
+    }
+    virtual void flush() {}
     int printf(const char *fmt, ...)
     {
         char b[256];

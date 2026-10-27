@@ -85,6 +85,17 @@ enum : uint16_t
 #define JW_DWIN_MAX_TEXT 128
 #endif
 
+// checkKeys() / readValues(): registros por lectura (Modbus admite hasta 125)
+// y mayor hueco entre dos VPs que se cubre con la misma lectura. Leer un registro de más
+// cuesta 2 bytes; un pedido aparte, una trama completa y la espera de la DWIN.
+#ifndef JW_DWIN_MAX_READ
+#define JW_DWIN_MAX_READ 125
+#endif
+
+#ifndef JW_DWIN_READ_MAX_GAP
+#define JW_DWIN_READ_MAX_GAP 16
+#endif
+
 class JW_DWIN
 {
 public:
@@ -142,6 +153,11 @@ public:
     // objeto queda sin confirmar (ver isConfirmed) y conserva su valor.
     bool readValue(DWIN_Value &obj, bool debug = false);
 
+    // readValue() de varios objetos con una lectura por tramo de VPs cercanos.
+    // changed[i] (opcional) queda en true si objs[i] cambió. Admite nullptr.
+    // Devuelve false si alguna lectura falló (esos objetos no cambian).
+    bool readValues(DWIN_Value *const objs[], uint8_t count, bool changed[] = nullptr);
+
     // true si la pantalla confirmó el valor/texto del objeto desde la última
     // reconexión. Un valor editable por el operador solo debe leerse como
     // edición cuando está confirmado; si no, se reenvía primero.
@@ -158,6 +174,12 @@ public:
     // Lee un botón tipo Key y, si se detecta pulsación, lo resetea en la HMI.
     void checkKey(DWIN_Key &key);
 
+    // Lee varias teclas con una lectura por tramo de VPs cercanos (en vez de
+    // una por tecla) y resetea en la HMI solo las pulsadas. Como checkKey,
+    // solo activa Enable; quien la consume la vuelve a 0. Admite nullptr.
+    // Devuelve false si alguna lectura falló (esas teclas no cambian).
+    bool checkKeys(DWIN_Key *const keys[], uint8_t count);
+
     // Manejo tipo encoder con dos teclas (Minus / Plus), con vuelta circular.
     void keyEncoder(DWIN_Key &minus, DWIN_Key &plus,
                     uint32_t &count,
@@ -165,6 +187,7 @@ public:
 
     // Acceso directo a un VP.
     bool readRegister(uint16_t vp, uint16_t &value);
+    bool readRegisters(uint16_t vp, uint16_t count, uint16_t *values);
     bool writeRegister(uint16_t vp, uint16_t value);
 
     // ===== Enlace =====
@@ -221,6 +244,12 @@ private:
     bool writeRegister(uint16_t address, uint16_t value, const char *tag);
     bool writeRegisters(uint16_t address, const uint16_t *values, uint16_t count, const char *tag);
     bool readRegister(uint16_t address, uint16_t &value, const char *tag);
+    bool readRegisters(uint16_t address, uint16_t count, uint16_t *values, const char *tag);
+
+    // Siguiente tramo de VPs (desde `from`) para checkKeys / readValues.
+    template <typename T>
+    static bool nextSpan(T *const objs[], uint8_t count, uint32_t &from,
+                         uint16_t &start, uint16_t &n);
 
     void dbgHeader(const char *tag);
     void dbgResult(const char *tag, uint16_t address, uint16_t value, bool ok, uint32_t t0);
