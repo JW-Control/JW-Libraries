@@ -8,3 +8,6 @@ OUT="$(mktemp -d)"
 ${CXX:-g++} -std=c++14 -Wall -Wextra -I"$HERE/mock" -I"$LIB/src" \
   "$HERE/test_dwin.cpp" "$LIB/src/JW_DWIN.cpp" -o "$OUT/test_dwin"
 "$OUT/test_dwin"
+${CXX:-g++} -std=c++14 -Wall -Wextra -I"$HERE/mock" -I"$LIB/src" \
+  "$HERE/test_usb.cpp" "$LIB/src/JW_DWIN_ModbusUSB.cpp" "$LIB/src/JW_DWIN.cpp" -o "$OUT/test_usb"
+"$OUT/test_usb"

@@ -151,6 +151,133 @@ void JW_DWIN::checkKey(DWIN_Key &key)
     }
 }
 
+template <typename T>
+bool JW_DWIN::nextSpan(T *const objs[], uint8_t count, uint32_t &from,
+                       uint16_t &start, uint16_t &n)
+{
+    // El tramo empieza en el menor VP aún sin leer y suma los siguientes
+    // mientras el hueco y el largo de la lectura lo permitan.
+    uint32_t first = 0x10000;
+    for (uint8_t i = 0; i < count; i++)
+    {
+        if (!objs[i])
+            continue;
+        const uint32_t a = vp(objs[i]->page, objs[i]->addr);
+        if (a >= from && a < first)
+            first = a;
+    }
+    if (first > 0xFFFF)
+        return false;
+
+    uint32_t end = first;
+    while (true)
+    {
+        uint32_t next = 0x10000;
+        for (uint8_t i = 0; i < count; i++)
+        {
+            if (!objs[i])
+                continue;
+            const uint32_t a = vp(objs[i]->page, objs[i]->addr);
+            if (a > end && a < next)
+                next = a;
+        }
+        if (next > 0xFFFF || next - end - 1 > JW_DWIN_READ_MAX_GAP ||
+            next - first + 1 > JW_DWIN_MAX_READ)
+            break;
+        end = next;
+    }
+    from = end + 1;
+    start = first;
+    n = end - first + 1;
+    return true;
+}
+
+bool JW_DWIN::checkKeys(DWIN_Key *const keys[], uint8_t count)
+{
+    bool ok = true;
+    uint32_t from = 0; // Primer VP aún sin leer
+    uint16_t start, n;
+
+    while (nextSpan(keys, count, from, start, n))
+    {
+        uint16_t values[JW_DWIN_MAX_READ];
+        if (!readRegisters(start, n, values, "checkKeys"))
+        {
+            ok = false;
+            continue;
+        }
+
+        for (uint8_t i = 0; i < count; i++)
+        {
+            if (!keys[i])
+                continue;
+            const uint32_t a = vp(keys[i]->page, keys[i]->addr);
+            if (a >= start && a < start + n && values[a - start] != 0)
+                keys[i]->Enable = 1;
+        }
+        // Limpiar en HMI una vez por VP (dos teclas pueden compartirlo).
+        for (uint8_t i = 0; i < count; i++)
+        {
+            if (!keys[i])
+                continue;
+            const uint32_t a = vp(keys[i]->page, keys[i]->addr);
+            if (a >= start && a < start + n && values[a - start] != 0)
+            {
+                values[a - start] = 0;
+                writeRegister(a, 0, "checkKeys");
+            }
+        }
+    }
+    return ok;
+}
+
+bool JW_DWIN::readValues(DWIN_Value *const objs[], uint8_t count, bool changed[])
+{
+    if (changed)
+        for (uint8_t i = 0; i < count; i++)
+            changed[i] = false;
+
+    bool ok = true;
+    uint32_t from = 0; // Primer VP aún sin leer
+    uint16_t start, n;
+
+    while (nextSpan(objs, count, from, start, n))
+    {
+        uint16_t values[JW_DWIN_MAX_READ];
+        const uint16_t epochBefore = _epoch;
+        if (!readRegisters(start, n, values, "readValues"))
+        {
+            ok = false;
+            continue;
+        }
+
+        for (uint8_t i = 0; i < count; i++)
+        {
+            if (!objs[i])
+                continue;
+            DWIN_Value &obj = *objs[i];
+            const uint32_t a = vp(obj.page, obj.addr);
+            if (a < start || a >= start + n)
+                continue;
+            // Como readValue: la lectura que restablece el enlace no cuenta.
+            if (_epoch != epochBefore)
+            {
+                obj.epoch = 0;
+                continue;
+            }
+            obj.epoch = _epoch;
+            if (values[a - start] != obj.val)
+            {
+                obj.val = values[a - start];
+                obj.fval = obj.val / divider(obj.decimal);
+                if (changed)
+                    changed[i] = true;
+            }
+        }
+    }
+    return ok;
+}
+
 void JW_DWIN::keyEncoder(DWIN_Key &minus, DWIN_Key &plus,
                          uint32_t &count,
                          uint32_t minv, uint32_t maxv)
@@ -189,6 +316,13 @@ void JW_DWIN::keyEncoder(DWIN_Key &minus, DWIN_Key &plus,
 bool JW_DWIN::readRegister(uint16_t vpAddress, uint16_t &value)
 {
     return readRegister(vpAddress, value, "readRegister");
+}
+
+bool JW_DWIN::readRegisters(uint16_t vpAddress, uint16_t count, uint16_t *values)
+{
+    if (count == 0)
+        return false;
+    return readRegisters(vpAddress, count, values, "readRegisters");
 }
 
 bool JW_DWIN::writeRegister(uint16_t vpAddress, uint16_t value)
@@ -355,6 +489,23 @@ bool JW_DWIN::readRegister(uint16_t address, uint16_t &value, const char *tag)
         }
     }
     dbgResult(tag, address, buffer, ok, t0);
+    return ok;
+}
+
+bool JW_DWIN::readRegisters(uint16_t address, uint16_t count, uint16_t *values,
+                            const char *tag)
+{
+    if (!allowAttempt())
+        return false;
+    const uint32_t t0 = micros();
+    const bool ok = _transport.readRegisters(address, count, values);
+    registerResult(ok);
+    if (ok && _dbg && (_dbgMask & DWIN_DBG_RX))
+    {
+        dbgHeader("RX");
+        _dbg->printf("addr=0x%04X n=%u\n", address, count);
+    }
+    dbgResult(tag, address, count, ok, t0);
     return ok;
 }
 
