@@ -1,3 +1,15 @@
+/*
+  Strings
+
+  Guarda y lee textos en la FRAM: String con writeString()/readString() y
+  textos fijos (const char[]) con writeCString()/readCString().
+
+  En el JWPLC Basic usa el objeto global JWPLC_FRAM (mismos métodos).
+
+  Qué mirar: el Monitor serie (115200) imprime «readString(): JWPLC Basic»
+  y «readCString(): JW Control».
+*/
+
 #include <JW_FRAM.h>
 
 JW_FRAM fram(JWPLC_FRAM_CS);  // CS de la FRAM del JWPLC Basic (GPIO13)

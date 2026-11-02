@@ -1,3 +1,19 @@
+/*
+  Block_Config
+
+  Guarda una configuración (struct) como bloque validado: writeBlock() le
+  añade versión y checksum, y readBlock() solo la acepta si coinciden. Así
+  una FRAM nueva o un struct cambiado no cargan basura.
+
+  updateBlock() guarda solo si el bloque cambió: sirve para llamarlo en
+  loop() sin gastar tiempo de bus cuando nada cambió.
+
+  En el JWPLC Basic usa el objeto global JWPLC_FRAM (mismos métodos).
+
+  Qué mirar: el Monitor serie (115200) imprime «Bloque validado leido
+  correctamente», el nombre de la máquina y los dos mensajes de updateBlock().
+*/
+
 #include <JW_FRAM.h>
 
 JW_FRAM fram(JWPLC_FRAM_CS);  // CS de la FRAM del JWPLC Basic (GPIO13)
