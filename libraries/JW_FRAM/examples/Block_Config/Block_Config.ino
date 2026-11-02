@@ -1,6 +1,6 @@
 #include <JW_FRAM.h>
 
-JW_FRAM fram(5);  // Pin CS
+JW_FRAM fram(JWPLC_FRAM_CS);  // CS de la FRAM del JWPLC Basic (GPIO13)
 
 struct SystemConfig {
   uint8_t configVersion;
@@ -46,6 +46,16 @@ void setup() {
     Serial.println(restaurado.totalStarts);
   } else {
     Serial.println("Bloque invalido o incompatible");
+  }
+
+  // updateBlock(): guarda solo si cambió (no gasta escrituras ni tiempo de bus
+  // si el bloque ya es igual). Útil para guardar en loop() «cuando cambie».
+  if (fram.updateBlock(128, cfg, 1)) {
+    Serial.println("updateBlock(): sin cambios, no se reescribe");
+  }
+  cfg.totalStarts++;
+  if (fram.updateBlock(128, cfg, 1)) {
+    Serial.println("updateBlock(): cambio guardado");
   }
 }
 

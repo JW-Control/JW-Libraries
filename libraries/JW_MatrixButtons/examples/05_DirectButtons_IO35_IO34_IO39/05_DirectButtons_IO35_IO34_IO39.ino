@@ -94,7 +94,7 @@ void loop() {
     Serial.println(value);
   }
 
-  JW_MatrixButtons::BtnEvent ev;
+  JW_ButtonEvent ev;
   for (uint8_t i = 0; i < btn.eventCount(); i++) {
     if (btn.getEvent(i, ev)) {
       Serial.print("event id=");

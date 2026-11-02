@@ -1,6 +1,6 @@
 #include <JW_FRAM.h>
 
-JW_FRAM fram(5);  // Pin CS
+JW_FRAM fram(JWPLC_FRAM_CS);  // CS de la FRAM del JWPLC Basic (GPIO13)
 
 void setup() {
   Serial.begin(115200);
@@ -24,7 +24,7 @@ void setup() {
     Serial.println(nombreLeido);
   }
 
-  const char *nombreProyecto = "JW Control";
+  const char nombreProyecto[] = "JW Control";
   if (fram.writeCString(64, nombreProyecto)) {
     Serial.println("CString almacenado correctamente");
   }

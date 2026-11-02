@@ -55,7 +55,7 @@ depends=Adafruit BusIO
 ```cpp
 #include <JW_FRAM.h>
 
-JW_FRAM fram(5);  // Pin CS
+JW_FRAM fram(JWPLC_FRAM_CS);  // CS de la FRAM del JWPLC Basic (GPIO13; GPIO5 es el CS del W5500)
 
 void setup() {
   Serial.begin(115200);
@@ -126,6 +126,15 @@ Escribe un valor completo en la FRAM.
 
 ### `update()`
 Primero lee el valor actual y solo escribe si detecta cambios.
+
+### `updateBlock()` (1.0.4)
+Como `writeBlock()`, pero solo escribe si el bloque guardado es distinto (cabecera, versión y datos). Devuelve
+`true` si el bloque quedó guardado, se haya escrito o no. Sirve para guardar «cuando cambie» sin copia ni
+`memcmp` en el sketch:
+
+```cpp
+JWPLC_FRAM.updateBlock(DIR_DATOS, datos, VERSION_DATOS);
+```
 
 ## Tipos compatibles en `get`, `put`, `update`, `writeBlock`, `readBlock`
 
@@ -261,44 +270,46 @@ fram.disableDebug();
 
 Eso evita amarrar la librería exclusivamente a `Serial`.
 
-## Lectura de cadenas (1.0.3)
+## Correcciones de lectura en Alpha13
 
-`readString()` distingue una cadena vacía válida de un fallo de lectura SPI,
-comprueba la reserva de memoria para textos no vacíos y acepta una cadena
-vacía en la última dirección disponible de la FRAM. Las firmas y el formato
-almacenado no cambian: no hace falta convertir ni borrar datos existentes.
+`readString()` distingue ahora una cadena vacía válida de un fallo de
+lectura SPI. También comprueba la reserva de memoria para textos no vacíos
+y acepta una cadena vacía en la última dirección disponible de la FRAM.
 
-## Dispositivos no soportados en la tabla interna
+Se conservan las firmas y el formato almacenado: primero la longitud y
+después los bytes del contenido. **No es necesario convertir ni borrar los
+datos existentes** por esta corrección.
 
-Si la librería no reconoce el `Device ID`, puedes forzar manualmente el tamaño al iniciar:
+En JWPLC Basic se mantiene el archive `libJW_FRAM.a` precompilado y
+verificado contra las fuentes correspondientes. Evita usar una copia
+externa de `JW_FRAM` que oculte la versión incluida en el package.
+
+## Pines en el JWPLC Basic (2.1.0-alpha.14)
+
+En el JWPLC Basic la FRAM comparte el bus SPI con la TFT, el W5500 y la
+microSD, y cada chip tiene su propio pin CS. Si escribes el número a mano
+es fácil equivocarse: el GPIO5, que aparecía en ejemplos antiguos, es el CS
+del **W5500**, no el de la FRAM.
+
+Por eso, desde 2.1.0-alpha.14, los ejemplos usan la constante del package:
 
 ```cpp
-fram.begin(8 * 1024);
+JW_FRAM fram(JWPLC_FRAM_CS);  // GPIO13 en el JWPLC Basic
 ```
 
-Eso permite trabajar con memorias FRAM compatibles aunque no estén todavía incluidas en la tabla interna.
+`JWPLC_FRAM_CS` la define el core del JWPLC; no necesitas ningún `#include`
+extra. En un sketch normal tampoco necesitas crear tu propio `JW_FRAM`: el
+objeto global `JWPLC_FRAM` (de `JWPLC_GlobalPeripherals`) ya está listo. Crea
+una instancia propia sólo si usas `JW_FRAM` en otra placa o en un ejemplo
+independiente como los de esta librería.
 
-## Estructura recomendada de la librería
+La librería y su `libJW_FRAM.a` no cambian en esta versión.
 
-La librería ya fue preparada con archivos compatibles con el ecosistema Arduino:
+## Estado de la versión bundled
 
-- `src/`
-- `examples/`
-- `library.properties`
-- `README.md`
-- `CHANGELOG.md`
-- `keywords.txt`
-- `LICENCE`
+```text
+JWPLC ESP32 v2.1.0-alpha.14
+JW_FRAM 1.0.3
+```
 
-## Ideas futuras
-
-Para versiones posteriores podrían añadirse:
-
-- CRC16 en lugar de checksum simple
-- funciones `fill()` o `clear()`
-- más modelos en la tabla de dispositivos
-- más ejemplos de uso orientados a productos JWPLC
-
-## Nota de licencia
-
-La base original de Adafruit usa licencia BSD. Si esta librería deriva de ese trabajo, se debe conservar la atribución correspondiente y mantener el texto de licencia apropiado. El repositorio de Adafruit FRAM SPI publica su licencia BSD con cláusula de atribución y limitación de responsabilidad. citeturn948721view0
+Corrección principal: escritura validada de bloques compatible con la FM25CL64B usada por JWPLC Basic.

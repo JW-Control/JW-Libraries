@@ -1,59 +1,58 @@
+/*
+  03_EventQueue
+
+  Cola de eventos PRESS / RELEASE / REPEAT de la botonera frontal del
+  JWPLC Basic / Basic Core (objeto global JWPLC_Buttons, ya escaneado por el
+  package; el sketch no llama a update()).
+
+  Cada evento trae:
+    e.id       tecla (BTN_LEFT, BTN_UP, BTN_RIGHT, BTN_ESC, BTN_OK, BTN_DOWN)
+    e.type     BTN_EV_PRESS, BTN_EV_RELEASE o BTN_EV_REPEAT
+    e.mult     multiplicador de la repetición (1, 10, 100...)
+    e.held_ms  tiempo que lleva pulsada
+
+  eventCount()/getEvent() muestran los eventos del último scan: con el scan en
+  segundo plano (cada 5 ms) pueden perderse eventos entre dos vueltas de
+  loop(). Para no perder pulsaciones usar pressed()/released(), que quedan
+  retenidos.
+
+  Qué mirar: el Monitor serie (115200) imprime una línea por evento.
+*/
+
 #include <Arduino.h>
-#include <JW_MatrixButtons.h>
 
-static const uint8_t ROW_PINS[2] = { 25, 26 };
-static const uint8_t COL_PINS[4] = { 35, 34, 39, 36 };
+// Nombres para imprimir, en el orden de los tipos (1 = PRESS, 2 = RELEASE, 3 = REPEAT).
+const char NOMBRE_EVENTO[][8] = {"?", "PRESS", "RELEASE", "REPEAT"};
 
-enum BtnId : uint8_t { BTN_INFO = 0,
-                       BTN_CONFIG,
-                       BTN_LEFT,
-                       BTN_START,
-                       BTN_RIGHT,
-                       BTN_UP,
-                       BTN_DOWN,
-                       BTN__COUNT };
-
-static const JW_MatrixButtons::BtnMapItem BTN_MAP[] = {
-  { BTN_INFO, 0, 0 }, { BTN_CONFIG, 0, 1 }, { BTN_LEFT, 0, 2 }, { BTN_START, 0, 3 }, { BTN_RIGHT, 1, 0 }, { BTN_UP, 1, 1 }, { BTN_DOWN, 1, 2 }
-};
-
-JW_MatrixButtons btn;
-
-static const char* evName(JW_MatrixButtons::EvType t) {
-  switch (t) {
-    case JW_MatrixButtons::EV_PRESS: return "PRESS";
-    case JW_MatrixButtons::EV_RELEASE: return "RELEASE";
-    case JW_MatrixButtons::EV_REPEAT: return "REPEAT";
-    default: return "?";
-  }
-}
-
-void setup() {
+void setup()
+{
   Serial.begin(115200);
-  btn.begin(ROW_PINS, 2, COL_PINS, 4, BTN_MAP, sizeof(BTN_MAP) / sizeof(BTN_MAP[0]), BTN__COUNT, false, 35);
 
-  btn.setRepeatEnabled(BTN_UP, true);
-  btn.setRepeatEnabled(BTN_DOWN, true);
-
+  JWPLC_Buttons.clearPendingInput();
   Serial.println("Event queue demo listo.");
 }
 
-void loop() {
-  btn.update();
+void loop()
+{
+  uint8_t cantidad = JWPLC_Buttons.eventCount();
+  if (cantidad == 0)
+    return;
 
-  for (uint8_t i = 0; i < btn.eventCount(); i++) {
-    JW_MatrixButtons::BtnEvent e;
-    if (btn.getEvent(i, e)) {
+  for (uint8_t i = 0; i < cantidad; i++)
+  {
+    JW_ButtonEvent e;
+    if (JWPLC_Buttons.getEvent(i, e))
+    {
       Serial.print("id=");
       Serial.print(e.id);
       Serial.print(" ");
-      Serial.print(evName(e.type));
+      Serial.print(e.type <= BTN_EV_REPEAT ? NOMBRE_EVENTO[e.type] : NOMBRE_EVENTO[0]);
       Serial.print(" mult=");
       Serial.print(e.mult);
       Serial.print(" held=");
       Serial.println(e.held_ms);
     }
   }
-
-  delay(5);
+  // Ya leídos: no volver a imprimirlos si el próximo scan aún no llegó.
+  JWPLC_Buttons.clearEventQueue();
 }

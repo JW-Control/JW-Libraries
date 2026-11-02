@@ -70,7 +70,7 @@ void setup()
     if (!rtc.begin())
     {
         Serial.print("RTC begin failed: ");
-        Serial.println(JW_RTC::errorToString(rtc.lastError()));
+        Serial.println(rtc.lastErrorString());
         return;
     }
 
@@ -170,7 +170,7 @@ Inicializa el RTC usando el bridge I2C del ecosistema JWPLC:
 ```cpp
 if (!rtc.begin())
 {
-    Serial.println(JW_RTC::errorToString(rtc.lastError()));
+    Serial.println(rtc.lastErrorString());
 }
 ```
 
@@ -273,7 +273,7 @@ dt.dayOfWeek = 0;
 
 if (!rtc.write(dt))
 {
-    Serial.println(JW_RTC::errorToString(rtc.lastError()));
+    Serial.println(rtc.lastErrorString());
 }
 ```
 
@@ -282,16 +282,15 @@ if (!rtc.write(dt))
 ## Setear desde fecha/hora de compilación
 
 ```cpp
-JWRTCDateTime dt;
-
-if (JW_RTC::fromBuildTime(__DATE__, __TIME__, dt))
+if (!rtc.isTimeValid())
 {
-    rtc.write(dt);
-    rtc.clearOscillatorStopFlag();
+    rtc.setFromBuildTime();   // fecha y hora de compilación del sketch
 }
 ```
 
-Esto es útil para cargar una hora inicial al momento de subir el sketch.
+Esto es útil para cargar una hora inicial al momento de subir el sketch. Conviene hacerlo solo si el RTC no
+tiene hora válida: si no, cada reinicio vuelve el reloj a la hora de compilación. `setFromBuildTime()` (1.0.3)
+equivale a `JW_RTC::fromBuildTime(__DATE__, __TIME__, dt)` + `rtc.write(dt)`, sin `::` en el sketch.
 
 ---
 
@@ -475,10 +474,12 @@ rtc.nvramReadObject(0, restored);
 JWRTCError err = rtc.lastError();
 ```
 
-### `errorToString()`
+### `lastErrorString()` y `errorToString()`
+
+`rtc.lastErrorString()` (1.0.3) devuelve el texto del último error; es lo que usan los ejemplos.
 
 ```cpp
-Serial.println(JW_RTC::errorToString(rtc.lastError()));
+Serial.println(rtc.lastErrorString());
 ```
 
 Errores típicos:
