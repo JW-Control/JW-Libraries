@@ -313,3 +313,12 @@ JW_FRAM 1.0.3
 ```
 
 Corrección principal: escritura validada de bloques compatible con la FM25CL64B usada por JWPLC Basic.
+
+## Ejemplos
+
+En Arduino IDE: *Archivo → Ejemplos → JW_FRAM*. Todos imprimen en el Monitor serie a 115200 y corren también en JWPLC Sim.
+
+- `Basic_RW`: variables sueltas con `put()`, `update()` y `get()`.
+- `Struct_Config`: un struct de configuración completo con `put()`/`get()`.
+- `Block_Config`: bloque validado con versión y checksum (`writeBlock()`, `readBlock()`) y `updateBlock()`, que guarda solo si cambió.
+- `Strings`: textos con `writeString()`/`readString()` y `writeCString()`/`readCString()`.

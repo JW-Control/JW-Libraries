@@ -561,3 +561,11 @@ Documentación propuesta en español para revisión de:
 JWPLC Basic v2.0.0-alpha.31
 JW_RTC
 ```
+
+## Ejemplos
+
+En Arduino IDE: *Archivo → Ejemplos → JW_RTC*. Todos imprimen en el Monitor serie a 115200 y corren también en JWPLC Sim.
+
+- `BasicRead`: fecha, hora y temperatura una vez por segundo.
+- `SetFromBuildTime`: pone el reloj en la hora de compilación si no tiene una hora válida (`setFromBuildTime()`).
+- `NvramDemo`: contador de arranques en la NVRAM con batería del DS3232M.
