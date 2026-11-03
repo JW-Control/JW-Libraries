@@ -1,7 +1,18 @@
+/*
+  CardInfo
+
+  Informa el tipo y el tamaño de la microSD.
+
+  Conexión: una microSD en la ranura del JWPLC Basic.
+
+  Qué mirar: el Monitor serie (115200) imprime «SD ready», «Card type» y
+  «Card size MB».
+*/
+
 #include <JW_SD.h>
 
 #ifndef SD_CS
-#define SD_CS 32
+#define SD_CS JWPLC_SD_CS  // CS de la microSD del JWPLC Basic (GPIO32)
 #endif
 
 JW_SD sd(SD_CS);

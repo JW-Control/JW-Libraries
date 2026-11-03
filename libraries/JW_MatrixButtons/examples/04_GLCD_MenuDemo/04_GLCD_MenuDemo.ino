@@ -29,7 +29,7 @@ enum BtnId : uint8_t {
 };
 
 // Mapeo confirmado
-static const JW_MatrixButtons::BtnMapItem BTN_MAP[] = {
+static const JW_ButtonMapItem BTN_MAP[] = {
   {BTN_INFO,   0, 0}, // SW1
   {BTN_CONFIG, 0, 1}, // SW2
   {BTN_LEFT,   0, 2}, // SW3

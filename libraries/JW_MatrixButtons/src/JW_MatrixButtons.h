@@ -101,6 +101,11 @@ public:
   bool pressed(uint8_t id) const;
   bool released(uint8_t id) const;
 
+  // Tecla virtual (p. ej. la botonera de JWPLC_WebScreen): mientras está en
+  // true cuenta como pulsada, sin antirrebote, con eventos y repetición normales.
+  void setVirtualDown(uint8_t id, bool down);
+  bool virtualDown(uint8_t id) const;
+
   // Limpieza de estados/eventos pendientes.
   void clearPendingPresses() const;
   void clearPendingReleases() const;
@@ -176,6 +181,7 @@ private:
 
   // Estado lógico por botón.
   bool _btnStable[MAX_BTNS];
+  volatile uint32_t _virtualMask = 0;
   bool _btnPrev[MAX_BTNS];
   uint32_t _btnPressStart[MAX_BTNS];
 
@@ -242,6 +248,7 @@ private:
   void updateDirect();
 
   void mapButtons();
+  void applyVirtual_();
   void pushEvent(uint8_t id, EvType type, int16_t mult, uint32_t held);
   void emitEdgesAndRepeats();
 
@@ -249,3 +256,17 @@ private:
   void repQPush_(uint8_t id, int16_t mult) const;
   bool repQPop_(uint8_t id, int16_t &mult) const;
 };
+
+// -----------------------------------------------------------------------------
+// Nombres globales (regla del «.»: el sketch no escribe «JW_MatrixButtons::»).
+//
+//   JW_ButtonEvent e;
+//   if (JWPLC_Buttons.getEvent(i, e) && e.type == BTN_EV_PRESS) { ... }
+//
+//   const JW_ButtonMapItem MAPA[] = { {0, 0, 0}, {1, 0, 1} };  // id, fila, columna
+// -----------------------------------------------------------------------------
+constexpr JW_MatrixButtons::EvType BTN_EV_PRESS = JW_MatrixButtons::EV_PRESS;
+constexpr JW_MatrixButtons::EvType BTN_EV_RELEASE = JW_MatrixButtons::EV_RELEASE;
+constexpr JW_MatrixButtons::EvType BTN_EV_REPEAT = JW_MatrixButtons::EV_REPEAT;
+typedef JW_MatrixButtons::BtnEvent JW_ButtonEvent;
+typedef JW_MatrixButtons::BtnMapItem JW_ButtonMapItem;

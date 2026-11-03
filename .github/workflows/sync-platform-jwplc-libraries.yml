@@ -8,6 +8,11 @@ on:
       - "libraries/JW_RS485/library.properties"
       - "libraries/JW_ModbusRTU/library.properties"
       - "libraries/JW_DWIN/library.properties"
+      - "libraries/JW_RTC/library.properties"
+      - "libraries/JW_FRAM/library.properties"
+      - "libraries/JW_SD/library.properties"
+      - "libraries/JW_MatrixButtons/library.properties"
+      - "tools/sync-platform-jwplc.sh"
       - ".github/workflows/sync-platform-jwplc-libraries.yml"
 
   workflow_dispatch:
@@ -101,6 +106,7 @@ jobs:
           echo "sync_branch=$PLATFORM_SYNC_BRANCH" >> "$GITHUB_OUTPUT"
           echo "platform_libraries_path=$PLATFORM_LIBRARIES_PATH" >> "$GITHUB_OUTPUT"
           echo "libraries=$LIBRARIES" >> "$GITHUB_OUTPUT"
+          echo "sync_exclude=${SYNC_EXCLUDE:-}" >> "$GITHUB_OUTPUT"
 
           echo "PLATFORM_REPO=$PLATFORM_REPO"
           echo "PLATFORM_BASE_BRANCH=$PLATFORM_BASE_BRANCH"
@@ -196,31 +202,16 @@ jobs:
 
       - name: Copy JW libraries into platform package
         shell: bash
+        env:
+          SYNC_REPORT: ${{ runner.temp }}/sync-report.txt
         run: |
           set -euo pipefail
-
-          LIBRARIES='${{ steps.cfg.outputs.libraries }}'
-          DST_ROOT="platform-jwplc/${{ steps.cfg.outputs.platform_libraries_path }}"
-
-          mkdir -p "$DST_ROOT"
-
-          for LIB in $LIBRARIES; do
-            SRC="libraries/$LIB"
-            DST="$DST_ROOT/$LIB"
-
-            echo "Syncing $SRC -> $DST"
-
-            rm -rf "$DST"
-            mkdir -p "$DST"
-
-            rsync -a \
-              --delete \
-              --exclude ".git" \
-              --exclude ".github" \
-              --exclude ".DS_Store" \
-              --exclude "Thumbs.db" \
-              "$SRC/" "$DST/"
-          done
+          # Conserva src/esp32/*.a de las precompiladas y las pasa a modo
+          # fuente solo si su código cambió (regla del package).
+          tools/sync-platform-jwplc.sh \
+            "platform-jwplc/${{ steps.cfg.outputs.platform_libraries_path }}" \
+            '${{ steps.cfg.outputs.libraries }}' \
+            '${{ steps.cfg.outputs.sync_exclude }}'
 
       - name: Write snapshot report into platform docs
         shell: bash
@@ -239,6 +230,12 @@ jobs:
             echo "base=${{ steps.cfg.outputs.base_branch }}"
             echo "sync=${{ steps.cfg.outputs.sync_branch }}"
             echo "path=${{ steps.cfg.outputs.platform_libraries_path }}"
+            echo '```'
+            echo
+            echo "Modo de cada librería en el package:"
+            echo
+            echo '```txt'
+            cat "${{ runner.temp }}/sync-report.txt"
             echo '```'
             echo
             echo "Nota:"
@@ -316,6 +313,12 @@ jobs:
           \`\`\`
 
           ## Notas
+
+          - Modo de cada librería (las que quedan en MODO FUENTE regeneran su \`.a\` al cierre de la alpha):
+
+          \`\`\`txt
+          $(cat "${{ runner.temp }}/sync-report.txt")
+          \`\`\`
 
           - Este PR no debe modificar \`boards.txt\`, \`platform.txt\`, core ni variantes.
           - Solo debe actualizar snapshots dentro de \`${{ steps.cfg.outputs.platform_libraries_path }}\`.
